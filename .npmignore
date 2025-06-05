@@ -1,0 +1,29 @@
+# Source files
+src/
+tsconfig.json
+
+# Development files
+test-server.js
+setup.sh
+examples/
+PROJECT_SUMMARY.md
+QUICK_START.md
+
+# Node modules and build artifacts
+node_modules/
+*.log
+.npm
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Git
+.git/
+.gitignore 

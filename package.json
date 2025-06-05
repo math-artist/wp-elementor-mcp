@@ -1,0 +1,60 @@
+{
+  "name": "wp-elementor-mcp",
+  "version": "1.0.0",
+  "description": "MCP server for interacting with Elementor and WordPress through natural language",
+  "main": "dist/index.js",
+  "bin": {
+    "wp-elementor-mcp": "./dist/index.js"
+  },
+  "type": "module",
+  "files": [
+    "dist/**/*",
+    "README.md",
+    "LICENSE",
+    "client-config.json"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "start": "node dist/index.js",
+    "test": "node test-server.js",
+    "prepare": "npm run build",
+    "prepublishOnly": "npm run build && npm test"
+  },
+  "keywords": [
+    "mcp", 
+    "elementor", 
+    "wordpress", 
+    "server", 
+    "model-context-protocol",
+    "ai",
+    "claude",
+    "llm"
+  ],
+  "author": "huetarded <your.email@example.com>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yourusername/elementor-wordpress-mcp.git"
+  },
+  "homepage": "https://github.com/yourusername/elementor-wordpress-mcp#readme",
+  "bugs": {
+    "url": "https://github.com/yourusername/elementor-wordpress-mcp/issues"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^0.4.0",
+    "axios": "^1.6.0",
+    "form-data": "^4.0.0",
+    "js-base64": "^3.7.5"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+} 
