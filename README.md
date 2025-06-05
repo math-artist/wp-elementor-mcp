@@ -5,8 +5,12 @@ A Model Context Protocol (MCP) server for interacting with WordPress and Element
 ## Features
 
 - **WordPress Content Management**: Full CRUD operations for posts and pages
-- **Elementor Integration**: Get and update Elementor page data and templates
+- **True Elementor Integration**: Create, read, and update real Elementor content with sections, columns, and widgets
+- **Automatic Post/Page Detection**: Elementor functions intelligently work with both posts and pages
+- **Rich Content Creation**: Build complex layouts with headings, text editors, buttons, images, and styling
+- **Content Conversion**: Transform regular WordPress content into Elementor-powered pages
 - **Media Management**: Upload and manage WordPress media library
+- **Environment Variable Support**: Easy configuration via environment variables
 - **Authentication**: Secure connection using WordPress application passwords
 - **Type-Safe**: Built with TypeScript for better development experience
 
@@ -156,7 +160,17 @@ Update page ID 5 with new title "Updated About Page" and add additional content 
 
 ### Get Elementor Data
 ```
-Get the Elementor data for post ID 123
+Get the Elementor data for page ID 9
+```
+
+### Create Elementor Content
+```
+Update page ID 37 with Elementor content including a hero section with heading "Welcome to Our Site", a text widget with introduction content, and a call-to-action button
+```
+
+### Convert Regular Content to Elementor
+```
+Update post ID 31 to use Elementor with a section containing a heading widget, text editor widget with rich content, and an image widget
 ```
 
 ### Upload Media
@@ -197,6 +211,8 @@ npm run dev
 ### Elementor Issues
 - Elementor template features require Elementor Pro
 - Make sure Elementor is activated and up to date
+- The `get_elementor_data` and `update_elementor_data` functions work with both posts and pages (automatically detects the correct endpoint)
+- If you experience timeouts with Elementor functions, ensure you're using version 1.2.2 or later
 - Some Elementor endpoints may not be available depending on your setup
 
 ### Permission Errors
