@@ -1,8 +1,8 @@
 {
   "mcpServers": {
     "elementor-wordpress": {
-      "command": "node",
-      "args": ["/Users/jasonmiller/Desktop/Projects/Working Files/Cursor/Elementor MCP/dist/index.js"],
+      "command": "npx",
+      "args": ["wp-elementor-mcp"],
       "env": {
         "NODE_ENV": "production"
       }

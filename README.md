@@ -19,7 +19,21 @@ A Model Context Protocol (MCP) server for interacting with WordPress and Element
 
 ## Installation
 
-1. Clone or download this repository
+### Option 1: NPX (Recommended)
+The easiest way to use this MCP server:
+
+```bash
+npx wp-elementor-mcp
+```
+
+### Option 2: Local Development
+For local development or modification:
+
+1. Clone this repository:
+   ```bash
+   git clone https://github.com/Huetarded/wp-elementor-mcp.git
+   cd wp-elementor-mcp
+   ```
 2. Install dependencies:
    ```bash
    npm install
@@ -63,8 +77,8 @@ Add this configuration to your MCP client (e.g., Claude Desktop):
 {
   "mcpServers": {
     "elementor-wordpress": {
-      "command": "node",
-      "args": ["/path/to/your/elementor-wordpress-mcp/dist/index.js"],
+      "command": "npx",
+      "args": ["wp-elementor-mcp"],
       "env": {}
     }
   }

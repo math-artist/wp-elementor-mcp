@@ -12,7 +12,7 @@ Get your Elementor WordPress MCP server running in 5 minutes!
 
 ```bash
 # Clone or download this repository
-cd elementor-wordpress-mcp
+cd wp-elementor-mcp
 
 # Run the automated setup
 ./setup.sh

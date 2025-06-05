@@ -31,15 +31,15 @@
     "claude",
     "llm"
   ],
-  "author": "huetarded <your.email@example.com>",
+  "author": "Jason Miller <jason@example.com>",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/yourusername/elementor-wordpress-mcp.git"
+    "url": "git+https://github.com/Huetarded/wp-elementor-mcp.git"
   },
-  "homepage": "https://github.com/yourusername/elementor-wordpress-mcp#readme",
+  "homepage": "https://github.com/Huetarded/wp-elementor-mcp#readme",
   "bugs": {
-    "url": "https://github.com/yourusername/elementor-wordpress-mcp/issues"
+    "url": "https://github.com/Huetarded/wp-elementor-mcp/issues"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^0.4.0",

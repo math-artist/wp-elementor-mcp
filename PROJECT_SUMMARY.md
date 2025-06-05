@@ -7,7 +7,7 @@ This project provides a complete **Model Context Protocol (MCP) server** for int
 ## 🏗️ Project Structure
 
 ```
-elementor-wordpress-mcp/
+wp-elementor-mcp/
 ├── src/
 │   └── index.ts              # Main MCP server implementation
 ├── dist/                     # Compiled JavaScript output
