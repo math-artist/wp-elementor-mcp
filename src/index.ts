@@ -703,10 +703,32 @@ class ElementorWordPressMCP {
     this.ensureAuthenticated();
     
     try {
-      // Get post meta for Elementor data
-      const response = await this.axiosInstance!.get(`posts/${args.post_id}`, {
-        params: { context: 'edit' }
-      });
+      // Try to get as post first, then as page if that fails
+      let response;
+      let postType = 'post';
+      
+      try {
+        response = await this.axiosInstance!.get(`posts/${args.post_id}`, {
+          params: { context: 'edit' }
+        });
+      } catch (postError: any) {
+        if (postError.response?.status === 404) {
+          // Try as page
+          try {
+            response = await this.axiosInstance!.get(`pages/${args.post_id}`, {
+              params: { context: 'edit' }
+            });
+            postType = 'page';
+          } catch (pageError: any) {
+            throw new McpError(
+              ErrorCode.InvalidRequest,
+              `Post/Page ID ${args.post_id} not found in posts or pages`
+            );
+          }
+        } else {
+          throw postError;
+        }
+      }
       
       // Try to get Elementor data from meta
       const elementorData = response.data.meta?._elementor_data;
@@ -717,11 +739,14 @@ class ElementorWordPressMCP {
             type: 'text',
             text: elementorData 
               ? JSON.stringify(JSON.parse(elementorData), null, 2)
-              : 'No Elementor data found for this post/page.',
+              : `No Elementor data found for this ${postType} (ID: ${args.post_id}).`,
           },
         ],
       };
     } catch (error: any) {
+      if (error instanceof McpError) {
+        throw error;
+      }
       throw new McpError(
         ErrorCode.InvalidRequest,
         `Failed to get Elementor data: ${error.response?.data?.message || error.message}`
@@ -741,17 +766,41 @@ class ElementorWordPressMCP {
         },
       };
 
-      const response = await this.axiosInstance!.post(`posts/${args.post_id}`, updateData);
+      // Try to update as post first, then as page if that fails
+      let response;
+      let postType = 'post';
+      
+      try {
+        response = await this.axiosInstance!.post(`posts/${args.post_id}`, updateData);
+      } catch (postError: any) {
+        if (postError.response?.status === 404) {
+          // Try as page
+          try {
+            response = await this.axiosInstance!.post(`pages/${args.post_id}`, updateData);
+            postType = 'page';
+          } catch (pageError: any) {
+            throw new McpError(
+              ErrorCode.InvalidRequest,
+              `Post/Page ID ${args.post_id} not found in posts or pages`
+            );
+          }
+        } else {
+          throw postError;
+        }
+      }
       
       return {
         content: [
           {
             type: 'text',
-            text: `Elementor data updated successfully for post ID: ${args.post_id}`,
+            text: `Elementor data updated successfully for ${postType} ID: ${args.post_id}`,
           },
         ],
       };
     } catch (error: any) {
+      if (error instanceof McpError) {
+        throw error;
+      }
       throw new McpError(
         ErrorCode.InvalidRequest,
         `Failed to update Elementor data: ${error.response?.data?.message || error.message}`
