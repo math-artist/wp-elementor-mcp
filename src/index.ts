@@ -223,6 +223,71 @@ class ElementorWordPressMCP {
             },
           },
           {
+            name: 'create_page',
+            description: 'Create a new WordPress page',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                title: {
+                  type: 'string',
+                  description: 'Page title',
+                },
+                content: {
+                  type: 'string',
+                  description: 'Page content (HTML)',
+                },
+                status: {
+                  type: 'string',
+                  description: 'Page status (draft, publish, private)',
+                  default: 'draft',
+                },
+                excerpt: {
+                  type: 'string',
+                  description: 'Page excerpt',
+                },
+                parent: {
+                  type: 'number',
+                  description: 'Parent page ID (for creating child pages)',
+                },
+              },
+              required: ['title', 'content'],
+            },
+          },
+          {
+            name: 'update_page',
+            description: 'Update an existing WordPress page',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                id: {
+                  type: 'number',
+                  description: 'Page ID to update',
+                },
+                title: {
+                  type: 'string',
+                  description: 'Page title',
+                },
+                content: {
+                  type: 'string',
+                  description: 'Page content (HTML)',
+                },
+                status: {
+                  type: 'string',
+                  description: 'Page status (draft, publish, private)',
+                },
+                excerpt: {
+                  type: 'string',
+                  description: 'Page excerpt',
+                },
+                parent: {
+                  type: 'number',
+                  description: 'Parent page ID (for creating child pages)',
+                },
+              },
+              required: ['id'],
+            },
+          },
+          {
             name: 'get_elementor_templates',
             description: 'Get Elementor templates (requires Elementor Pro)',
             inputSchema: {
@@ -333,6 +398,10 @@ class ElementorWordPressMCP {
             return await this.updatePost(args as any);
           case 'get_pages':
             return await this.getPages(args as any);
+          case 'create_page':
+            return await this.createPage(args as any);
+          case 'update_page':
+            return await this.updatePage(args as any);
           case 'get_elementor_templates':
             return await this.getElementorTemplates(args as any);
           case 'get_elementor_data':
@@ -534,6 +603,64 @@ class ElementorWordPressMCP {
         {
           type: 'text',
           text: JSON.stringify(response.data, null, 2),
+        },
+      ],
+    };
+  }
+
+  private async createPage(args: {
+    title: string;
+    content: string;
+    status?: string;
+    excerpt?: string;
+    parent?: number;
+  }) {
+    this.ensureAuthenticated();
+    
+    const pageData = {
+      title: args.title,
+      content: args.content,
+      status: args.status || 'draft',
+      ...(args.excerpt && { excerpt: args.excerpt }),
+      ...(args.parent && { parent: args.parent }),
+    };
+
+    const response = await this.axiosInstance!.post('pages', pageData);
+    
+    return {
+      content: [
+        {
+          type: 'text',
+          text: `Page created successfully!\nID: ${response.data.id}\nTitle: ${response.data.title.rendered}\nStatus: ${response.data.status}\nURL: ${response.data.link}`,
+        },
+      ],
+    };
+  }
+
+  private async updatePage(args: {
+    id: number;
+    title?: string;
+    content?: string;
+    status?: string;
+    excerpt?: string;
+    parent?: number;
+  }) {
+    this.ensureAuthenticated();
+    
+    const updateData: any = {};
+    if (args.title) updateData.title = args.title;
+    if (args.content) updateData.content = args.content;
+    if (args.status) updateData.status = args.status;
+    if (args.excerpt) updateData.excerpt = args.excerpt;
+    if (args.parent !== undefined) updateData.parent = args.parent;
+
+    const response = await this.axiosInstance!.post(`pages/${args.id}`, updateData);
+    
+    return {
+      content: [
+        {
+          type: 'text',
+          text: `Page updated successfully!\nID: ${response.data.id}\nTitle: ${response.data.title.rendered}\nStatus: ${response.data.status}`,
         },
       ],
     };
