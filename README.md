@@ -4,7 +4,7 @@ A Model Context Protocol (MCP) server for interacting with WordPress and Element
 
 ## Features
 
-- **WordPress Content Management**: Create, read, update posts and pages
+- **WordPress Content Management**: Full CRUD operations for posts and pages
 - **Elementor Integration**: Get and update Elementor page data and templates
 - **Media Management**: Upload and manage WordPress media library
 - **Authentication**: Secure connection using WordPress application passwords
@@ -115,6 +115,8 @@ npm start
 - `create_post` - Create new posts
 - `update_post` - Update existing posts
 - `get_pages` - Retrieve WordPress pages
+- `create_page` - Create new WordPress pages
+- `update_page` - Update existing WordPress pages
 
 ### Elementor
 - `get_elementor_templates` - Get Elementor templates (requires Elementor Pro)
@@ -140,6 +142,16 @@ Use the configure_wordpress tool to connect to my WordPress site at https://mysi
 ### Create a Post
 ```
 Create a new WordPress post with title "Hello World" and content "<h1>Welcome to my blog!</h1><p>This is my first post created via MCP.</p>"
+```
+
+### Create a Page
+```
+Create a new WordPress page with title "About Us" and content "<h1>About Our Company</h1><p>Learn more about our mission and values.</p>"
+```
+
+### Update a Page
+```
+Update page ID 5 with new title "Updated About Page" and add additional content about our team
 ```
 
 ### Get Elementor Data
