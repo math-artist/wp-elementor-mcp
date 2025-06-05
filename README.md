@@ -63,15 +63,9 @@ Your WordPress user should have sufficient permissions to:
 
 ## Usage
 
-### Running the Server
+### Configuration (Environment Variables - Recommended)
 
-```bash
-npm start
-```
-
-### Connecting from MCP Clients
-
-Add this configuration to your MCP client (e.g., Claude Desktop):
+The recommended way to configure the MCP server is through environment variables. Add this configuration to your MCP client (e.g., Claude Desktop):
 
 ```json
 {
@@ -79,24 +73,41 @@ Add this configuration to your MCP client (e.g., Claude Desktop):
     "elementor-wordpress": {
       "command": "npx",
       "args": ["wp-elementor-mcp"],
-      "env": {}
+      "env": {
+        "WORDPRESS_BASE_URL": "https://yoursite.com",
+        "WORDPRESS_USERNAME": "your-wp-username",
+        "WORDPRESS_APPLICATION_PASSWORD": "xxxx xxxx xxxx xxxx xxxx xxxx"
+      }
     }
   }
 }
 ```
 
-### First Time Setup
+**Environment Variables:**
+- `WORDPRESS_BASE_URL`: Your WordPress site URL (e.g., `https://yoursite.com`)
+- `WORDPRESS_USERNAME`: Your WordPress username
+- `WORDPRESS_APPLICATION_PASSWORD`: The application password you generated
 
-1. Start the MCP server
+### Alternative: Manual Configuration
+
+If you prefer not to use environment variables, you can manually configure the connection:
+
+1. Start the MCP server without environment variables
 2. Use the `configure_wordpress` tool with your WordPress credentials:
    - **baseUrl**: Your WordPress site URL (e.g., `https://yoursite.com`)
    - **username**: Your WordPress username
    - **applicationPassword**: The application password you generated
 
+### Running the Server Locally
+
+```bash
+npm start
+```
+
 ## Available Tools
 
 ### WordPress Configuration
-- `configure_wordpress` - Set up connection to your WordPress site
+- `configure_wordpress` - Set up connection to your WordPress site (optional if environment variables are configured)
 
 ### Posts & Pages
 - `get_posts` - Retrieve WordPress posts with filtering options
@@ -118,7 +129,10 @@ Add this configuration to your MCP client (e.g., Claude Desktop):
 
 Here are some example commands you can use with an MCP client:
 
-### Initial Setup
+### Setup with Environment Variables (Recommended)
+No initial setup needed - the server automatically connects using your environment variables!
+
+### Alternative Manual Setup
 ```
 Use the configure_wordpress tool to connect to my WordPress site at https://mysite.com with username "admin" and application password "xxxx xxxx xxxx xxxx xxxx xxxx"
 ```

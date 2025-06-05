@@ -33,8 +33,33 @@ class ElementorWordPressMCP {
       }
     );
 
+    // Initialize WordPress configuration from environment variables
+    this.initializeFromEnvironment();
+
     this.setupToolHandlers();
     this.setupResourceHandlers();
+  }
+
+  private initializeFromEnvironment() {
+    const baseUrl = process.env.WORDPRESS_BASE_URL;
+    const username = process.env.WORDPRESS_USERNAME;
+    const applicationPassword = process.env.WORDPRESS_APPLICATION_PASSWORD;
+
+    if (baseUrl && username && applicationPassword) {
+      console.error('Initializing WordPress connection from environment variables...');
+      this.setupAxios({
+        baseUrl: baseUrl.replace(/\/$/, ''), // Remove trailing slash if present
+        username,
+        applicationPassword
+      });
+      console.error('WordPress connection configured successfully');
+    } else {
+      console.error('WordPress environment variables not found. Manual configuration will be required.');
+      console.error('Required environment variables:');
+      console.error('- WORDPRESS_BASE_URL');
+      console.error('- WORDPRESS_USERNAME');
+      console.error('- WORDPRESS_APPLICATION_PASSWORD');
+    }
   }
 
   private setupAxios(config: WordPressConfig) {
@@ -53,7 +78,7 @@ class ElementorWordPressMCP {
     if (!this.axiosInstance || !this.config) {
       throw new McpError(
         ErrorCode.InvalidRequest,
-        'WordPress connection not configured. Use configure_wordpress tool first.'
+        'WordPress connection not configured. Please set environment variables (WORDPRESS_BASE_URL, WORDPRESS_USERNAME, WORDPRESS_APPLICATION_PASSWORD) or use the configure_wordpress tool.'
       );
     }
   }
@@ -64,7 +89,7 @@ class ElementorWordPressMCP {
         tools: [
           {
             name: 'configure_wordpress',
-            description: 'Configure WordPress connection with base URL and application password',
+            description: 'Configure WordPress connection with base URL and application password (only needed if environment variables are not set)',
             inputSchema: {
               type: 'object',
               properties: {
