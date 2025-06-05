@@ -1,10 +1,10 @@
 {
   "name": "wp-elementor-mcp",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "MCP server for interacting with Elementor and WordPress through natural language",
   "main": "dist/index.js",
   "bin": {
-    "wp-elementor-mcp": "./dist/index.js"
+    "wp-elementor-mcp": "dist/index.js"
   },
   "type": "module",
   "files": [
@@ -22,10 +22,10 @@
     "prepublishOnly": "npm run build && npm test"
   },
   "keywords": [
-    "mcp", 
-    "elementor", 
-    "wordpress", 
-    "server", 
+    "mcp",
+    "elementor",
+    "wordpress",
+    "server",
     "model-context-protocol",
     "ai",
     "claude",
@@ -57,4 +57,4 @@
   "publishConfig": {
     "access": "public"
   }
-} 
+}
