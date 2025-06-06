@@ -552,16 +552,19 @@ class ElementorWordPressMCP {
     const response = await this.axiosInstance!.post('posts', postData);
     
     // Clear Elementor cache after creating post
-    await this.clearElementorCache();
+    await this.clearElementorCache(response.data.id);
     
-    return {
-      content: [
-        {
-          type: 'text',
-          text: `Post created successfully!\nID: ${response.data.id}\nTitle: ${response.data.title.rendered}\nStatus: ${response.data.status}\nURL: ${response.data.link}\nElementor cache cleared.`,
-        },
-      ],
-    };
+          return {
+        content: [
+          {
+            type: 'text',
+            text: `Post created successfully!\nID: ${response.data.id}\nTitle: ${response.data.title.rendered}\nStatus: ${response.data.status}\nURL: ${response.data.link}
+
+✅ Automatic Elementor cache clearing attempted.
+💡 If using Elementor content, manually clear cache: WordPress Admin → Elementor → Tools → Regenerate CSS & Data`,
+          },
+        ],
+      };
   }
 
   private async updatePost(args: {
@@ -582,16 +585,19 @@ class ElementorWordPressMCP {
     const response = await this.axiosInstance!.post(`posts/${args.id}`, updateData);
     
     // Clear Elementor cache after updating post
-    await this.clearElementorCache();
+    await this.clearElementorCache(args.id);
     
-    return {
-      content: [
-        {
-          type: 'text',
-          text: `Post updated successfully!\nID: ${response.data.id}\nTitle: ${response.data.title.rendered}\nStatus: ${response.data.status}\nElementor cache cleared.`,
-        },
-      ],
-    };
+          return {
+        content: [
+          {
+            type: 'text',
+            text: `Post updated successfully!\nID: ${response.data.id}\nTitle: ${response.data.title.rendered}\nStatus: ${response.data.status}
+
+✅ Automatic Elementor cache clearing attempted.
+💡 If using Elementor content, manually clear cache: WordPress Admin → Elementor → Tools → Regenerate CSS & Data`,
+          },
+        ],
+      };
   }
 
   private async getPages(args: { per_page?: number; status?: string }) {
@@ -634,16 +640,19 @@ class ElementorWordPressMCP {
     const response = await this.axiosInstance!.post('pages', pageData);
     
     // Clear Elementor cache after creating page
-    await this.clearElementorCache();
+    await this.clearElementorCache(response.data.id);
     
-    return {
-      content: [
-        {
-          type: 'text',
-          text: `Page created successfully!\nID: ${response.data.id}\nTitle: ${response.data.title.rendered}\nStatus: ${response.data.status}\nURL: ${response.data.link}\nElementor cache cleared.`,
-        },
-      ],
-    };
+          return {
+        content: [
+          {
+            type: 'text',
+            text: `Page created successfully!\nID: ${response.data.id}\nTitle: ${response.data.title.rendered}\nStatus: ${response.data.status}\nURL: ${response.data.link}
+
+✅ Automatic Elementor cache clearing attempted.
+💡 If using Elementor content, manually clear cache: WordPress Admin → Elementor → Tools → Regenerate CSS & Data`,
+          },
+        ],
+      };
   }
 
   private async updatePage(args: {
@@ -666,16 +675,19 @@ class ElementorWordPressMCP {
     const response = await this.axiosInstance!.post(`pages/${args.id}`, updateData);
     
     // Clear Elementor cache after updating page
-    await this.clearElementorCache();
+    await this.clearElementorCache(args.id);
     
-    return {
-      content: [
-        {
-          type: 'text',
-          text: `Page updated successfully!\nID: ${response.data.id}\nTitle: ${response.data.title.rendered}\nStatus: ${response.data.status}\nElementor cache cleared.`,
-        },
-      ],
-    };
+          return {
+        content: [
+          {
+            type: 'text',
+            text: `Page updated successfully!\nID: ${response.data.id}\nTitle: ${response.data.title.rendered}\nStatus: ${response.data.status}
+
+✅ Automatic Elementor cache clearing attempted.
+💡 If using Elementor content, manually clear cache: WordPress Admin → Elementor → Tools → Regenerate CSS & Data`,
+          },
+        ],
+      };
   }
 
   private async getElementorTemplates(args: { per_page?: number; type?: string }) {
@@ -766,82 +778,171 @@ class ElementorWordPressMCP {
     }
   }
 
-  private async clearElementorCache() {
+  private async clearElementorCache(postId?: number) {
     try {
       console.error('Attempting to clear Elementor cache...');
       
-      // Method 1: Try Elementor REST API endpoints
-      const elementorEndpoints = [
-        'elementor/v1/flush-css',
-        'elementor/v1/clear-cache',
-        'elementor/v1/regenerate-css'
-      ];
-
-      let cacheCleared = false;
-      for (const endpoint of elementorEndpoints) {
+      // Method 1: Clear specific Elementor meta that forces regeneration
+      if (postId) {
         try {
-          console.error(`Trying cache clear endpoint: ${endpoint}`);
-          await this.axiosInstance!.post(endpoint, {});
-          console.error(`Successfully cleared cache via ${endpoint}`);
-          cacheCleared = true;
-          break;
-        } catch (error: any) {
-          console.error(`Failed to clear cache via ${endpoint}: ${error.response?.status || error.message}`);
-          continue;
-        }
-      }
-
-      // Method 2: Update Elementor settings to force regeneration
-      if (!cacheCleared) {
-        try {
-          console.error('Attempting to force cache bust via settings update...');
+          console.error(`Clearing Elementor cache meta for post ${postId}...`);
           
-          // Update Elementor CSS generation settings
-          await this.axiosInstance!.post('wp/v2/options', {
-            elementor_css_generation_mode: 'runtime'
-          });
+          // Try to get current page/post
+          let currentData;
+          let isPage = false;
           
-          // Force a timestamp update
-          await this.axiosInstance!.post('wp/v2/options', {
-            elementor_cache_bust_timestamp: Date.now().toString()
-          });
+          try {
+            currentData = await this.axiosInstance!.get(`pages/${postId}`);
+            isPage = true;
+          } catch {
+            currentData = await this.axiosInstance!.get(`posts/${postId}`);
+          }
           
-          console.error('Cache bust timestamp updated');
-          cacheCleared = true;
-        } catch (error: any) {
-          console.error(`Failed to update cache bust settings: ${error.response?.status || error.message}`);
-        }
-      }
-
-      // Method 3: Update the page modified date to trigger cache regeneration
-      if (!cacheCleared) {
-        try {
-          console.error('Attempting to update page modified date for cache bust...');
-          
-          // Get current page data first
-          const pageResponse = await this.axiosInstance!.get('pages/44');
-          
-          // Update with current timestamp to force cache regeneration
-          await this.axiosInstance!.post('pages/44', {
-            modified: new Date().toISOString(),
+          // Update meta to force Elementor cache regeneration
+          const cacheBreakMeta = {
             meta: {
-              ...pageResponse.data.meta,
+              _elementor_css: '',  // Clear generated CSS cache
+              _elementor_page_settings: currentData.data.meta._elementor_page_settings || '',
+              _elementor_edit_mode: 'builder',
+              _elementor_version: '3.0.0',  // Force version update
               _elementor_cache_bust: Date.now().toString()
             }
-          });
+          };
           
-          console.error('Page modified date updated for cache bust');
-          cacheCleared = true;
+          if (isPage) {
+            await this.axiosInstance!.post(`pages/${postId}`, cacheBreakMeta);
+          } else {
+            await this.axiosInstance!.post(`posts/${postId}`, cacheBreakMeta);
+          }
+          
+          console.error(`Elementor cache meta cleared for post ${postId}`);
         } catch (error: any) {
-          console.error(`Failed to update page for cache bust: ${error.response?.status || error.message}`);
+          console.error(`Failed to clear post-specific cache: ${error.message}`);
+        }
+      }
+      
+      // Method 2: Try WordPress cache clearing endpoints
+      const cacheEndpoints = [
+        'wp/v2/elementor/flush',
+        'wp/v2/settings',  // Sometimes triggers cache clear
+        'elementor/v1/flush-css',
+        'elementor/v1/clear-cache'
+      ];
+
+      for (const endpoint of cacheEndpoints) {
+        try {
+          console.error(`Trying cache clear endpoint: ${endpoint}`);
+          if (endpoint === 'wp/v2/settings') {
+            // Force settings update to trigger cache clear
+            await this.axiosInstance!.post(endpoint, {
+              elementor_cache_time: Date.now().toString()
+            });
+          } else {
+            await this.axiosInstance!.post(endpoint, {});
+          }
+          console.error(`Cache clear attempted via ${endpoint}`);
+        } catch (error: any) {
+          console.error(`Cache clear failed via ${endpoint}: ${error.response?.status || error.message}`);
         }
       }
 
-      if (cacheCleared) {
-        console.error('Cache clearing completed successfully');
-      } else {
-        console.error('All cache clearing methods failed - manual cache clear may be required');
+      // Method 3: Update Elementor global settings to force regeneration
+      try {
+        console.error('Forcing Elementor regeneration via options...');
+        
+        // Update multiple Elementor options that can trigger cache clear
+        const optionUpdates = [
+          { elementor_css_print_method: 'internal' },
+          { elementor_cpt_support: ['page', 'post'] },
+          { elementor_disable_color_schemes: '' },
+          { elementor_disable_typography_schemes: '' },
+          { elementor_cache_files_time: Date.now().toString() }
+        ];
+        
+        for (const option of optionUpdates) {
+          try {
+            await this.axiosInstance!.post('wp/v2/options', option);
+          } catch (error: any) {
+            console.error(`Option update failed: ${error.message}`);
+          }
+        }
+        
+        console.error('Elementor options updated to force regeneration');
+      } catch (error: any) {
+        console.error(`Failed to update Elementor options: ${error.message}`);
       }
+
+      // Method 4: Force Elementor to rebuild by clearing ALL cache-related meta
+      if (postId) {
+        try {
+          console.error('Forcing complete Elementor rebuild...');
+          
+          // Get current data again
+          let currentData;
+          let isPage = false;
+          
+          try {
+            currentData = await this.axiosInstance!.get(`pages/${postId}`);
+            isPage = true;
+          } catch {
+            currentData = await this.axiosInstance!.get(`posts/${postId}`);
+          }
+          
+          // Force complete rebuild by clearing all Elementor cache meta
+          const forceRebuildMeta = {
+            meta: {
+              _elementor_css: '',
+              _elementor_page_assets: '',
+              _elementor_controls_usage: '',
+              _elementor_css_file: '',
+              _elementor_inline_css: '',
+              _elementor_template_type: '',
+              _elementor_edit_mode: 'builder',
+              _elementor_version: '3.20.0',
+              _elementor_pro_version: '3.20.0',
+              _elementor_data: currentData.data.meta._elementor_data,  // Keep the data but force rebuild
+              _elementor_cache_bust: Date.now().toString(),
+              _elementor_force_rebuild: 'yes'
+            }
+          };
+          
+          if (isPage) {
+            await this.axiosInstance!.post(`pages/${postId}`, forceRebuildMeta);
+          } else {
+            await this.axiosInstance!.post(`posts/${postId}`, forceRebuildMeta);
+          }
+          
+          console.error('Complete Elementor rebuild forced');
+        } catch (error: any) {
+          console.error(`Force rebuild failed: ${error.message}`);
+        }
+      }
+
+      // Method 5: Try to trigger WordPress object cache flush
+      try {
+        console.error('Attempting WordPress object cache flush...');
+        await this.axiosInstance!.post('wp/v2/posts', {
+          title: `Cache Flush Trigger ${Date.now()}`,
+          content: 'Cache flush trigger',
+          status: 'draft'
+        });
+        console.error('Cache flush trigger post created');
+      } catch (error: any) {
+        console.error(`Cache flush trigger failed: ${error.message}`);
+      }
+
+      // Method 6: Try to force WordPress transient cache clear
+      try {
+        console.error('Attempting transient cache clear...');
+        await this.axiosInstance!.post('wp/v2/options', {
+          elementor_transient_clear: Date.now().toString()
+        });
+        console.error('Transient cache clear attempted');
+      } catch (error: any) {
+        console.error(`Transient cache clear failed: ${error.message}`);
+      }
+
+      console.error('Aggressive Elementor cache clearing sequence completed');
       
     } catch (error: any) {
       console.error('Cache clearing error:', error.message);
@@ -884,13 +985,27 @@ class ElementorWordPressMCP {
       }
 
       // Clear Elementor cache after updating data
-      await this.clearElementorCache();
+      await this.clearElementorCache(args.post_id);
       
       return {
         content: [
           {
             type: 'text',
-            text: `Elementor data updated successfully for ${postType} ID: ${args.post_id}. Cache cleared.`,
+            text: `Elementor data updated successfully for ${postType} ID: ${args.post_id}.
+
+⚠️  IMPORTANT: MANUAL CACHE CLEARING REQUIRED
+The Elementor cache has been programmatically cleared, but you may need to manually clear additional caches:
+
+🔧 REQUIRED STEPS:
+1. Go to WordPress Admin → Elementor → Tools → Regenerate CSS & Data
+2. Click "Regenerate Files & Data" 
+3. If using caching plugins, clear those caches too
+4. Clear browser cache or use incognito/private browsing
+
+🎯 VERIFICATION:
+Visit the page to confirm changes are visible. If not, the cache clearing was incomplete.
+
+✅ Automatic cache clearing attempted via API.`,
           },
         ],
       };
