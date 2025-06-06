@@ -68,9 +68,11 @@ Your WordPress user should have sufficient permissions to:
 
 ## Usage
 
-### Configuration (Environment Variables - Recommended)
+### Configuration
 
-The recommended way to configure the MCP server is through environment variables. Add this configuration to your MCP client (e.g., Claude Desktop):
+For use with your MCP client (e.g., Claude Desktop):
+
+[![Install MCP Server](https://cursor.com/deeplink/mcp-install-dark.svg)](https://cursor.com/install-mcp?name=elementor-wordpress&config=eyJjb21tYW5kIjoibnB4IHdwLWVsZW1lbnRvci1tY3AiLCJlbnYiOnsiV09SRFBSRVNTX0JBU0VfVVJMIjoiaHR0cHM6Ly95b3Vyc2l0ZS5jb20iLCJXT1JEUFJFU1NfVVNFUk5BTUUiOiJ5b3VyLXdwLXVzZXJuYW1lIiwiV09SRFBSRVNTX0FQUExJQ0FUSU9OX1BBU1NXT1JEIjoieHh4eCB4eHh4IHh4eHggeHh4eCB4eHh4IHh4eHgifX0%3D)
 
 ```json
 {
