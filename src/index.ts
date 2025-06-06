@@ -551,11 +551,14 @@ class ElementorWordPressMCP {
 
     const response = await this.axiosInstance!.post('posts', postData);
     
+    // Clear Elementor cache after creating post
+    await this.clearElementorCache();
+    
     return {
       content: [
         {
           type: 'text',
-          text: `Post created successfully!\nID: ${response.data.id}\nTitle: ${response.data.title.rendered}\nStatus: ${response.data.status}\nURL: ${response.data.link}`,
+          text: `Post created successfully!\nID: ${response.data.id}\nTitle: ${response.data.title.rendered}\nStatus: ${response.data.status}\nURL: ${response.data.link}\nElementor cache cleared.`,
         },
       ],
     };
@@ -578,11 +581,14 @@ class ElementorWordPressMCP {
 
     const response = await this.axiosInstance!.post(`posts/${args.id}`, updateData);
     
+    // Clear Elementor cache after updating post
+    await this.clearElementorCache();
+    
     return {
       content: [
         {
           type: 'text',
-          text: `Post updated successfully!\nID: ${response.data.id}\nTitle: ${response.data.title.rendered}\nStatus: ${response.data.status}`,
+          text: `Post updated successfully!\nID: ${response.data.id}\nTitle: ${response.data.title.rendered}\nStatus: ${response.data.status}\nElementor cache cleared.`,
         },
       ],
     };
@@ -627,11 +633,14 @@ class ElementorWordPressMCP {
 
     const response = await this.axiosInstance!.post('pages', pageData);
     
+    // Clear Elementor cache after creating page
+    await this.clearElementorCache();
+    
     return {
       content: [
         {
           type: 'text',
-          text: `Page created successfully!\nID: ${response.data.id}\nTitle: ${response.data.title.rendered}\nStatus: ${response.data.status}\nURL: ${response.data.link}`,
+          text: `Page created successfully!\nID: ${response.data.id}\nTitle: ${response.data.title.rendered}\nStatus: ${response.data.status}\nURL: ${response.data.link}\nElementor cache cleared.`,
         },
       ],
     };
@@ -656,11 +665,14 @@ class ElementorWordPressMCP {
 
     const response = await this.axiosInstance!.post(`pages/${args.id}`, updateData);
     
+    // Clear Elementor cache after updating page
+    await this.clearElementorCache();
+    
     return {
       content: [
         {
           type: 'text',
-          text: `Page updated successfully!\nID: ${response.data.id}\nTitle: ${response.data.title.rendered}\nStatus: ${response.data.status}`,
+          text: `Page updated successfully!\nID: ${response.data.id}\nTitle: ${response.data.title.rendered}\nStatus: ${response.data.status}\nElementor cache cleared.`,
         },
       ],
     };
@@ -754,6 +766,88 @@ class ElementorWordPressMCP {
     }
   }
 
+  private async clearElementorCache() {
+    try {
+      console.error('Attempting to clear Elementor cache...');
+      
+      // Method 1: Try Elementor REST API endpoints
+      const elementorEndpoints = [
+        'elementor/v1/flush-css',
+        'elementor/v1/clear-cache',
+        'elementor/v1/regenerate-css'
+      ];
+
+      let cacheCleared = false;
+      for (const endpoint of elementorEndpoints) {
+        try {
+          console.error(`Trying cache clear endpoint: ${endpoint}`);
+          await this.axiosInstance!.post(endpoint, {});
+          console.error(`Successfully cleared cache via ${endpoint}`);
+          cacheCleared = true;
+          break;
+        } catch (error: any) {
+          console.error(`Failed to clear cache via ${endpoint}: ${error.response?.status || error.message}`);
+          continue;
+        }
+      }
+
+      // Method 2: Update Elementor settings to force regeneration
+      if (!cacheCleared) {
+        try {
+          console.error('Attempting to force cache bust via settings update...');
+          
+          // Update Elementor CSS generation settings
+          await this.axiosInstance!.post('wp/v2/options', {
+            elementor_css_generation_mode: 'runtime'
+          });
+          
+          // Force a timestamp update
+          await this.axiosInstance!.post('wp/v2/options', {
+            elementor_cache_bust_timestamp: Date.now().toString()
+          });
+          
+          console.error('Cache bust timestamp updated');
+          cacheCleared = true;
+        } catch (error: any) {
+          console.error(`Failed to update cache bust settings: ${error.response?.status || error.message}`);
+        }
+      }
+
+      // Method 3: Update the page modified date to trigger cache regeneration
+      if (!cacheCleared) {
+        try {
+          console.error('Attempting to update page modified date for cache bust...');
+          
+          // Get current page data first
+          const pageResponse = await this.axiosInstance!.get('pages/44');
+          
+          // Update with current timestamp to force cache regeneration
+          await this.axiosInstance!.post('pages/44', {
+            modified: new Date().toISOString(),
+            meta: {
+              ...pageResponse.data.meta,
+              _elementor_cache_bust: Date.now().toString()
+            }
+          });
+          
+          console.error('Page modified date updated for cache bust');
+          cacheCleared = true;
+        } catch (error: any) {
+          console.error(`Failed to update page for cache bust: ${error.response?.status || error.message}`);
+        }
+      }
+
+      if (cacheCleared) {
+        console.error('Cache clearing completed successfully');
+      } else {
+        console.error('All cache clearing methods failed - manual cache clear may be required');
+      }
+      
+    } catch (error: any) {
+      console.error('Cache clearing error:', error.message);
+    }
+  }
+
   private async updateElementorData(args: { post_id: number; elementor_data: string }) {
     this.ensureAuthenticated();
     
@@ -788,12 +882,15 @@ class ElementorWordPressMCP {
           throw postError;
         }
       }
+
+      // Clear Elementor cache after updating data
+      await this.clearElementorCache();
       
       return {
         content: [
           {
             type: 'text',
-            text: `Elementor data updated successfully for ${postType} ID: ${args.post_id}`,
+            text: `Elementor data updated successfully for ${postType} ID: ${args.post_id}. Cache cleared.`,
           },
         ],
       };

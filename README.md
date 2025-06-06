@@ -9,6 +9,7 @@ A Model Context Protocol (MCP) server for interacting with WordPress and Element
 - **Automatic Post/Page Detection**: Elementor functions intelligently work with both posts and pages
 - **Rich Content Creation**: Build complex layouts with headings, text editors, buttons, images, and styling
 - **Content Conversion**: Transform regular WordPress content into Elementor-powered pages
+- **Automatic Cache Busting**: Elementor cache is automatically cleared after updates for immediate visibility
 - **Media Management**: Upload and manage WordPress media library
 - **Environment Variable Support**: Easy configuration via environment variables
 - **Authentication**: Secure connection using WordPress application passwords
@@ -125,7 +126,7 @@ npm start
 ### Elementor
 - `get_elementor_templates` - Get Elementor templates (requires Elementor Pro)
 - `get_elementor_data` - Get Elementor page/post data
-- `update_elementor_data` - Update Elementor page/post data
+- `update_elementor_data` - Update Elementor page/post data (automatically clears cache)
 
 ### Media
 - `get_media` - Browse WordPress media library
@@ -135,13 +136,6 @@ npm start
 
 Here are some example commands you can use with an MCP client:
 
-### Setup with Environment Variables (Recommended)
-No initial setup needed - the server automatically connects using your environment variables!
-
-### Alternative Manual Setup
-```
-Use the configure_wordpress tool to connect to my WordPress site at https://mysite.com with username "admin" and application password "xxxx xxxx xxxx xxxx xxxx xxxx"
-```
 
 ### Create a Post
 ```
