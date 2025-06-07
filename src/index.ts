@@ -13,6 +13,7 @@ import {
 import axios, { AxiosInstance } from 'axios';
 import FormData from 'form-data';
 import { Base64 } from 'js-base64';
+import { getServerConfig, ServerConfig } from './server-config.js';
 
 interface WordPressConfig {
   baseUrl: string;
@@ -24,8 +25,11 @@ class ElementorWordPressMCP {
   private server: Server;
   private axiosInstance: AxiosInstance | null = null;
   private config: WordPressConfig | null = null;
+  private serverConfig: ServerConfig;
 
   constructor() {
+    this.serverConfig = getServerConfig();
+    
     this.server = new Server(
       {
         name: 'elementor-wordpress-mcp',
@@ -85,30 +89,35 @@ class ElementorWordPressMCP {
 
   private setupToolHandlers() {
     this.server.setRequestHandler(ListToolsRequestSchema, async () => {
-      return {
-        tools: [
-          {
-            name: 'configure_wordpress',
-            description: 'Configure WordPress connection with base URL and application password (only needed if environment variables are not set)',
-            inputSchema: {
-              type: 'object',
-              properties: {
-                baseUrl: {
-                  type: 'string',
-                  description: 'WordPress site base URL (e.g., https://yoursite.com)',
-                },
-                username: {
-                  type: 'string',
-                  description: 'WordPress username',
-                },
-                applicationPassword: {
-                  type: 'string',
-                  description: 'WordPress application password (not regular password)',
-                },
-              },
-              required: ['baseUrl', 'username', 'applicationPassword'],
+      const tools: any[] = [];
+      
+      // Always include configuration tool
+      tools.push({
+        name: 'configure_wordpress',
+        description: 'Configure WordPress connection with base URL and application password (only needed if environment variables are not set)',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            baseUrl: {
+              type: 'string',
+              description: 'WordPress site base URL (e.g., https://yoursite.com)',
+            },
+            username: {
+              type: 'string',
+              description: 'WordPress username',
+            },
+            applicationPassword: {
+              type: 'string',
+              description: 'WordPress application password (not regular password)',
             },
           },
+          required: ['baseUrl', 'username', 'applicationPassword'],
+        },
+      });
+
+      // Add tools based on configuration
+      if (this.serverConfig.basicWordPressOperations) {
+        tools.push(
           {
             name: 'get_posts',
             description: 'Retrieve WordPress posts with optional filtering',
@@ -288,8 +297,53 @@ class ElementorWordPressMCP {
             },
           },
           {
+            name: 'get_media',
+            description: 'Get WordPress media library items',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                per_page: {
+                  type: 'number',
+                  description: 'Number of media items to retrieve (default: 10)',
+                  default: 10,
+                },
+                media_type: {
+                  type: 'string',
+                  description: 'Media type (image, video, audio, etc.)',
+                },
+              },
+            },
+          },
+          {
+            name: 'upload_media',
+            description: 'Upload media file to WordPress',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                file_path: {
+                  type: 'string',
+                  description: 'Local path to file to upload',
+                },
+                title: {
+                  type: 'string',
+                  description: 'Media title',
+                },
+                alt_text: {
+                  type: 'string',
+                  description: 'Alt text for images',
+                },
+              },
+              required: ['file_path'],
+            },
+          }
+        );
+      }
+
+      if (this.serverConfig.basicElementorOperations) {
+        tools.push(
+          {
             name: 'get_elementor_templates',
-            description: 'Get Elementor templates (requires Elementor Pro)',
+            description: 'Get Elementor templates',
             inputSchema: {
               type: 'object',
               properties: {
@@ -307,31 +361,13 @@ class ElementorWordPressMCP {
           },
           {
             name: 'get_elementor_data',
-            description: 'Get Elementor page/post data',
+            description: 'Get complete Elementor data for a page',
             inputSchema: {
               type: 'object',
               properties: {
                 post_id: {
                   type: 'number',
-                  description: 'Post/Page ID to get Elementor data for',
-                },
-              },
-              required: ['post_id'],
-            },
-          },
-          {
-            name: 'backup_elementor_data',
-            description: 'Create a backup of current Elementor data before making changes',
-            inputSchema: {
-              type: 'object',
-              properties: {
-                post_id: {
-                  type: 'number',
-                  description: 'Post/Page ID to backup',
-                },
-                backup_name: {
-                  type: 'string',
-                  description: 'Optional backup name (default: timestamp)',
+                  description: 'Post/Page ID',
                 },
               },
               required: ['post_id'],
@@ -339,7 +375,7 @@ class ElementorWordPressMCP {
           },
           {
             name: 'update_elementor_data',
-            description: 'Update Elementor page/post data',
+            description: 'Update complete Elementor data for a page',
             inputSchema: {
               type: 'object',
               properties: {
@@ -349,7 +385,7 @@ class ElementorWordPressMCP {
                 },
                 elementor_data: {
                   type: 'string',
-                  description: 'Elementor JSON data as string',
+                  description: 'Complete Elementor data as JSON string',
                 },
               },
               required: ['post_id', 'elementor_data'],
@@ -483,47 +519,425 @@ class ElementorWordPressMCP {
             },
           },
           {
-            name: 'get_media',
-            description: 'Get WordPress media library items',
+            name: 'backup_elementor_data',
+            description: 'Create a backup of Elementor page data',
             inputSchema: {
               type: 'object',
               properties: {
-                per_page: {
+                post_id: {
                   type: 'number',
-                  description: 'Number of media items to retrieve (default: 10)',
-                  default: 10,
+                  description: 'Post/Page ID to backup',
                 },
-                media_type: {
+                backup_name: {
                   type: 'string',
-                  description: 'Media type (image, video, audio, etc.)',
+                  description: 'Optional name for the backup',
                 },
               },
+              required: ['post_id'],
             },
           },
           {
-            name: 'upload_media',
-            description: 'Upload media file to WordPress',
+            name: 'clear_elementor_cache',
+            description: 'Clear Elementor cache for better performance',
             inputSchema: {
               type: 'object',
               properties: {
-                file_path: {
-                  type: 'string',
-                  description: 'Local path to file to upload',
-                },
-                title: {
-                  type: 'string',
-                  description: 'Media title',
-                },
-                alt_text: {
-                  type: 'string',
-                  description: 'Alt text for images',
+                post_id: {
+                  type: 'number',
+                  description: 'Optional: specific post ID to clear cache for',
                 },
               },
-              required: ['file_path'],
+            },
+          }
+        );
+      }
+
+      if (this.serverConfig.sectionContainerCreation) {
+        tools.push(
+          {
+            name: 'create_elementor_section',
+            description: 'Create a new Elementor section with specified columns',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                post_id: {
+                  type: 'number',
+                  description: 'Post/Page ID to add section to',
+                },
+                position: {
+                  type: 'number',
+                  description: 'Position to insert the section (0-based, default: append to end)',
+                },
+                columns: {
+                  type: 'number',
+                  description: 'Number of columns to create (default: 1)',
+                  default: 1,
+                },
+                section_settings: {
+                  type: 'object',
+                  description: 'Optional settings for the section',
+                },
+              },
+              required: ['post_id'],
             },
           },
-        ],
-      };
+          {
+            name: 'create_elementor_container',
+            description: 'Create a new Elementor container (Flexbox)',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                post_id: {
+                  type: 'number',
+                  description: 'Post/Page ID to add container to',
+                },
+                position: {
+                  type: 'number',
+                  description: 'Position to insert the container (0-based, default: append to end)',
+                },
+                container_settings: {
+                  type: 'object',
+                  description: 'Optional settings for the container',
+                },
+              },
+              required: ['post_id'],
+            },
+          },
+          {
+            name: 'add_column_to_section',
+            description: 'Add columns to an existing Elementor section',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                post_id: {
+                  type: 'number',
+                  description: 'Post/Page ID',
+                },
+                section_id: {
+                  type: 'string',
+                  description: 'Section ID to add columns to',
+                },
+                columns_to_add: {
+                  type: 'number',
+                  description: 'Number of columns to add (default: 1)',
+                  default: 1,
+                },
+              },
+              required: ['post_id', 'section_id'],
+            },
+          },
+          {
+            name: 'duplicate_section',
+            description: 'Duplicate an existing Elementor section',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                post_id: {
+                  type: 'number',
+                  description: 'Post/Page ID',
+                },
+                section_id: {
+                  type: 'string',
+                  description: 'Section ID to duplicate',
+                },
+                position: {
+                  type: 'number',
+                  description: 'Position to insert the duplicated section (0-based, default: after original)',
+                },
+              },
+              required: ['post_id', 'section_id'],
+            },
+          }
+        );
+      }
+
+      if (this.serverConfig.widgetAddition) {
+        tools.push(
+          {
+            name: 'add_widget_to_section',
+            description: 'Add a widget to a specific section/column',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                post_id: {
+                  type: 'number',
+                  description: 'Post/Page ID',
+                },
+                section_id: {
+                  type: 'string',
+                  description: 'Target section ID (optional if column_id is provided)',
+                },
+                column_id: {
+                  type: 'string',
+                  description: 'Target column ID (optional if section_id is provided)',
+                },
+                widget_type: {
+                  type: 'string',
+                  description: 'Widget type (e.g., "heading", "text", "image", "button")',
+                },
+                widget_settings: {
+                  type: 'object',
+                  description: 'Widget settings and content',
+                },
+                position: {
+                  type: 'number',
+                  description: 'Position within the container (0-based, default: append)',
+                },
+              },
+              required: ['post_id', 'widget_type'],
+            },
+          },
+          {
+            name: 'insert_widget_at_position',
+            description: 'Insert a widget at a specific position relative to another element',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                post_id: {
+                  type: 'number',
+                  description: 'Post/Page ID',
+                },
+                widget_type: {
+                  type: 'string',
+                  description: 'Widget type to insert',
+                },
+                widget_settings: {
+                  type: 'object',
+                  description: 'Widget settings and content',
+                },
+                target_element_id: {
+                  type: 'string',
+                  description: 'Element ID to insert relative to',
+                },
+                insert_position: {
+                  type: 'string',
+                  description: 'Position relative to target: "before", "after", "inside" (default: "after")',
+                  default: 'after',
+                },
+              },
+              required: ['post_id', 'widget_type', 'target_element_id'],
+            },
+          },
+          {
+            name: 'clone_widget',
+            description: 'Clone an existing widget',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                post_id: {
+                  type: 'number',
+                  description: 'Post/Page ID',
+                },
+                widget_id: {
+                  type: 'string',
+                  description: 'Widget ID to clone',
+                },
+                target_element_id: {
+                  type: 'string',
+                  description: 'Element ID to insert cloned widget relative to (optional)',
+                },
+                insert_position: {
+                  type: 'string',
+                  description: 'Position relative to target: "before", "after", "inside" (default: "after")',
+                  default: 'after',
+                },
+              },
+              required: ['post_id', 'widget_id'],
+            },
+          },
+          {
+            name: 'move_widget',
+            description: 'Move a widget to a different section/column',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                post_id: {
+                  type: 'number',
+                  description: 'Post/Page ID',
+                },
+                widget_id: {
+                  type: 'string',
+                  description: 'Widget ID to move',
+                },
+                target_section_id: {
+                  type: 'string',
+                  description: 'Target section ID (optional if target_column_id is provided)',
+                },
+                target_column_id: {
+                  type: 'string',
+                  description: 'Target column ID (optional if target_section_id is provided)',
+                },
+                position: {
+                  type: 'number',
+                  description: 'Position within target container (0-based, default: append)',
+                },
+              },
+              required: ['post_id', 'widget_id'],
+            },
+          }
+        );
+      }
+
+      if (this.serverConfig.elementManagement) {
+        tools.push(
+          {
+            name: 'delete_elementor_element',
+            description: 'Delete an Elementor element (section, column, or widget)',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                post_id: {
+                  type: 'number',
+                  description: 'Post/Page ID',
+                },
+                element_id: {
+                  type: 'string',
+                  description: 'Element ID to delete',
+                },
+              },
+              required: ['post_id', 'element_id'],
+            },
+          },
+          {
+            name: 'reorder_elements',
+            description: 'Reorder elements within a container',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                post_id: {
+                  type: 'number',
+                  description: 'Post/Page ID',
+                },
+                container_id: {
+                  type: 'string',
+                  description: 'Container ID (section or column)',
+                },
+                element_ids: {
+                  type: 'array',
+                  description: 'Array of element IDs in desired order',
+                  items: {
+                    type: 'string',
+                  },
+                },
+              },
+              required: ['post_id', 'container_id', 'element_ids'],
+            },
+          },
+          {
+            name: 'copy_element_settings',
+            description: 'Copy settings from one element to another',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                post_id: {
+                  type: 'number',
+                  description: 'Post/Page ID',
+                },
+                source_element_id: {
+                  type: 'string',
+                  description: 'Source element ID to copy from',
+                },
+                target_element_id: {
+                  type: 'string',
+                  description: 'Target element ID to copy to',
+                },
+                settings_to_copy: {
+                  type: 'array',
+                  description: 'Specific setting keys to copy (optional, copies all if not specified)',
+                  items: {
+                    type: 'string',
+                  },
+                },
+              },
+              required: ['post_id', 'source_element_id', 'target_element_id'],
+            },
+          }
+        );
+      }
+
+      if (this.serverConfig.pageStructure) {
+        tools.push(
+          {
+            name: 'get_page_structure',
+            description: 'Get a simplified overview of the page structure',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                post_id: {
+                  type: 'number',
+                  description: 'Post/Page ID',
+                },
+                include_settings: {
+                  type: 'boolean',
+                  description: 'Include basic settings for each element (default: false)',
+                  default: false,
+                },
+              },
+              required: ['post_id'],
+            },
+          }
+        );
+      }
+
+      if (this.serverConfig.performanceOptimization) {
+        tools.push(
+          {
+            name: 'clear_elementor_cache_by_page',
+            description: 'Clear Elementor cache for a specific page',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                post_id: {
+                  type: 'number',
+                  description: 'Post/Page ID to clear cache for',
+                },
+              },
+              required: ['post_id'],
+            },
+          }
+        );
+      }
+
+      if (this.serverConfig.advancedElementOperations) {
+        tools.push(
+          {
+            name: 'find_elements_by_type',
+            description: 'Find all elements of a specific type on a page',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                post_id: {
+                  type: 'number',
+                  description: 'Post/Page ID',
+                },
+                widget_type: {
+                  type: 'string',
+                  description: 'Widget type to search for (e.g., "heading", "text", "image")',
+                },
+                include_settings: {
+                  type: 'boolean',
+                  description: 'Include element settings in results (default: false)',
+                  default: false,
+                },
+              },
+              required: ['post_id', 'widget_type'],
+            },
+          }
+        );
+      }
+
+      // Add tool count to help users understand which mode is active
+      const totalEnabled = this.serverConfig.getTotalEnabledFeatures();
+      
+      if (process.env.NODE_ENV !== 'production') {
+        console.error(`[Config] Loaded ${tools.length} tools (Mode: ${this.serverConfig.mode}, Features: ${totalEnabled})`);
+        console.error(`[Config] Active features: ${Object.entries(this.serverConfig)
+          .filter(([key, value]) => typeof value === 'boolean' && value && key !== 'mode')
+          .map(([key]) => key)
+          .join(', ')}`);
+      }
+
+      return { tools };
     });
 
     this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
@@ -569,6 +983,82 @@ class ElementorWordPressMCP {
             return await this.getMedia(args as any);
           case 'upload_media':
             return await this.uploadMedia(args as any);
+          // Section and Container Creation Tools
+          case 'create_elementor_section':
+            return await this.createElementorSection(args as any);
+          case 'create_elementor_container':
+            return await this.createElementorContainer(args as any);
+          case 'add_column_to_section':
+            return await this.addColumnToSection(args as any);
+          case 'duplicate_section':
+            return await this.duplicateSection(args as any);
+          // Widget Addition Tools
+          case 'add_widget_to_section':
+            return await this.addWidgetToSection(args as any);
+          case 'insert_widget_at_position':
+            return await this.insertWidgetAtPosition(args as any);
+          case 'clone_widget':
+            return await this.cloneWidget(args as any);
+          case 'move_widget':
+            return await this.moveWidget(args as any);
+          // Element Management Tools
+          case 'delete_elementor_element':
+            return await this.deleteElementorElement(args as any);
+          case 'reorder_elements':
+            return await this.reorderElements(args as any);
+          case 'copy_element_settings':
+            return await this.copyElementSettings(args as any);
+          // Template Management
+          case 'create_elementor_template':
+            return await this.createElementorTemplate(args as any);
+          case 'apply_template_to_page':
+            return await this.applyTemplateToPage(args as any);
+          case 'export_elementor_template':
+            return await this.exportElementorTemplate(args as any);
+          case 'import_elementor_template':
+            return await this.importElementorTemplate(args as any);
+          // Global Settings Management
+          case 'get_elementor_global_colors':
+            return await this.getElementorGlobalColors(args as any);
+          case 'update_elementor_global_colors':
+            return await this.updateElementorGlobalColors(args as any);
+          case 'get_elementor_global_fonts':
+            return await this.getElementorGlobalFonts(args as any);
+          case 'update_elementor_global_fonts':
+            return await this.updateElementorGlobalFonts(args as any);
+          // Page Structure Tools
+          case 'get_page_structure':
+            return await this.getPageStructure(args as any);
+          case 'rebuild_page_structure':
+            return await this.rebuildPageStructure(args as any);
+          case 'validate_elementor_data':
+            return await this.validateElementorData(args as any);
+          // Performance & Optimization
+          case 'regenerate_css':
+            return await this.regenerateCSS(args as any);
+          case 'optimize_elementor_assets':
+            return await this.optimizeElementorAssets(args as any);
+          case 'clear_elementor_cache_by_page':
+            return await this.clearElementorCacheByPage(args as any);
+          // Advanced Element Operations
+          case 'find_elements_by_type':
+            return await this.findElementsByType(args as any);
+          case 'bulk_update_widget_settings':
+            return await this.bulkUpdateWidgetSettings(args as any);
+          case 'replace_widget_content':
+            return await this.replaceWidgetContent(args as any);
+          // Custom Fields Integration
+          case 'get_elementor_custom_fields':
+            return await this.getElementorCustomFields(args as any);
+          case 'update_dynamic_content_sources':
+            return await this.updateDynamicContentSources(args as any);
+          // Revision and History
+          case 'get_elementor_revisions':
+            return await this.getElementorRevisions(args as any);
+          case 'restore_elementor_revision':
+            return await this.restoreElementorRevision(args as any);
+          case 'compare_elementor_revisions':
+            return await this.compareElementorRevisions(args as any);
           default:
             throw new McpError(ErrorCode.MethodNotFound, `Unknown tool: ${name}`);
         }
@@ -1892,6 +2382,1462 @@ Backup Details:
         `Failed to upload media: ${error.response?.data?.message || error.message}`
       );
     }
+  }
+
+  // Section and Container Creation Tools
+  private async createElementorSection(args: { post_id: number; position?: number; columns?: number; section_settings?: object }) {
+    this.ensureAuthenticated();
+    
+    try {
+      // Get current Elementor data
+      const currentElementorData = await this.getElementorData({ post_id: args.post_id });
+      const currentDataText = currentElementorData.content[0].text;
+      
+      let elementorData: any[] = [];
+      if (!currentDataText.includes('No Elementor data found')) {
+        try {
+          elementorData = JSON.parse(currentDataText);
+        } catch (parseError) {
+          elementorData = [];
+        }
+      }
+      
+      // Generate unique ID for the section
+      const sectionId = Math.random().toString(36).substr(2, 8);
+      const columns = args.columns || 1;
+      
+      // Create column elements
+      const columnElements = [];
+      for (let i = 0; i < columns; i++) {
+        const columnId = Math.random().toString(36).substr(2, 8);
+        columnElements.push({
+          id: columnId,
+          elType: 'column',
+          isInner: false,
+          settings: {
+            _column_size: Math.floor(100 / columns),
+            _inline_size: null
+          },
+          elements: [],
+          widgetType: null
+        });
+      }
+      
+      // Create new section
+      const newSection = {
+        id: sectionId,
+        elType: 'section',
+        isInner: false,
+        settings: args.section_settings || {},
+        elements: columnElements,
+        widgetType: null
+      };
+      
+      // Insert section at specified position or at the end
+      if (args.position !== undefined && args.position >= 0 && args.position < elementorData.length) {
+        elementorData.splice(args.position, 0, newSection);
+      } else {
+        elementorData.push(newSection);
+      }
+      
+      // Update the page
+      await this.updateElementorData({
+        post_id: args.post_id,
+        elementor_data: JSON.stringify(elementorData)
+      });
+      
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `Section created successfully! Section ID: ${sectionId}\nColumns: ${columns}\nPosition: ${args.position || 'end'}`,
+          },
+        ],
+      };
+    } catch (error: any) {
+      if (error instanceof McpError) {
+        throw error;
+      }
+      throw new McpError(
+        ErrorCode.InvalidRequest,
+        `Failed to create section: ${error.message}`
+      );
+    }
+  }
+
+  private async createElementorContainer(args: { post_id: number; position?: number; container_settings?: object }) {
+    this.ensureAuthenticated();
+    
+    try {
+      // Get current Elementor data
+      const currentElementorData = await this.getElementorData({ post_id: args.post_id });
+      const currentDataText = currentElementorData.content[0].text;
+      
+      let elementorData: any[] = [];
+      if (!currentDataText.includes('No Elementor data found')) {
+        try {
+          elementorData = JSON.parse(currentDataText);
+        } catch (parseError) {
+          elementorData = [];
+        }
+      }
+      
+      // Generate unique ID for the container
+      const containerId = Math.random().toString(36).substr(2, 8);
+      
+      // Create new container (Elementor v3.6+ flexbox container)
+      const newContainer = {
+        id: containerId,
+        elType: 'container',
+        isInner: false,
+        settings: {
+          content_width: 'boxed',
+          flex_direction: 'column',
+          ...args.container_settings
+        },
+        elements: [],
+        widgetType: null
+      };
+      
+      // Insert container at specified position or at the end
+      if (args.position !== undefined && args.position >= 0 && args.position < elementorData.length) {
+        elementorData.splice(args.position, 0, newContainer);
+      } else {
+        elementorData.push(newContainer);
+      }
+      
+      // Update the page
+      await this.updateElementorData({
+        post_id: args.post_id,
+        elementor_data: JSON.stringify(elementorData)
+      });
+      
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `Container created successfully! Container ID: ${containerId}\nPosition: ${args.position || 'end'}`,
+          },
+        ],
+      };
+    } catch (error: any) {
+      if (error instanceof McpError) {
+        throw error;
+      }
+      throw new McpError(
+        ErrorCode.InvalidRequest,
+        `Failed to create container: ${error.message}`
+      );
+    }
+  }
+
+  private async addColumnToSection(args: { post_id: number; section_id: string; columns_to_add?: number }) {
+    this.ensureAuthenticated();
+    
+    try {
+      // Get current Elementor data
+      const currentElementorData = await this.getElementorData({ post_id: args.post_id });
+      const currentDataText = currentElementorData.content[0].text;
+      
+      if (currentDataText.includes('No Elementor data found')) {
+        throw new McpError(
+          ErrorCode.InvalidRequest,
+          `No Elementor data found for post/page ID ${args.post_id}`
+        );
+      }
+      
+      let elementorData: any[];
+      try {
+        elementorData = JSON.parse(currentDataText);
+      } catch (parseError) {
+        throw new McpError(
+          ErrorCode.InvalidRequest,
+          `Failed to parse current Elementor data: ${parseError}`
+        );
+      }
+      
+      const columnsToAdd = args.columns_to_add || 1;
+      let sectionFound = false;
+      
+      // Function to find and update section
+      const findAndUpdateSection = (elements: any[]): boolean => {
+        for (let element of elements) {
+          if (element.id === args.section_id && element.elType === 'section') {
+            // Add new columns
+            for (let i = 0; i < columnsToAdd; i++) {
+              const columnId = Math.random().toString(36).substr(2, 8);
+              element.elements.push({
+                id: columnId,
+                elType: 'column',
+                isInner: false,
+                settings: {},
+                elements: [],
+                widgetType: null
+              });
+            }
+            return true;
+          }
+          
+          if (element.elements && element.elements.length > 0) {
+            if (findAndUpdateSection(element.elements)) {
+              return true;
+            }
+          }
+        }
+        return false;
+      };
+      
+      sectionFound = findAndUpdateSection(elementorData);
+      
+      if (!sectionFound) {
+        throw new McpError(
+          ErrorCode.InvalidRequest,
+          `Section ID ${args.section_id} not found`
+        );
+      }
+      
+      // Update the page
+      await this.updateElementorData({
+        post_id: args.post_id,
+        elementor_data: JSON.stringify(elementorData)
+      });
+      
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `Successfully added ${columnsToAdd} column(s) to section ${args.section_id}`,
+          },
+        ],
+      };
+    } catch (error: any) {
+      if (error instanceof McpError) {
+        throw error;
+      }
+      throw new McpError(
+        ErrorCode.InvalidRequest,
+        `Failed to add columns to section: ${error.message}`
+      );
+    }
+  }
+
+  private async duplicateSection(args: { post_id: number; section_id: string; position?: number }) {
+    this.ensureAuthenticated();
+    
+    try {
+      // Get current Elementor data
+      const currentElementorData = await this.getElementorData({ post_id: args.post_id });
+      const currentDataText = currentElementorData.content[0].text;
+      
+      if (currentDataText.includes('No Elementor data found')) {
+        throw new McpError(
+          ErrorCode.InvalidRequest,
+          `No Elementor data found for post/page ID ${args.post_id}`
+        );
+      }
+      
+      let elementorData: any[];
+      try {
+        elementorData = JSON.parse(currentDataText);
+      } catch (parseError) {
+        throw new McpError(
+          ErrorCode.InvalidRequest,
+          `Failed to parse current Elementor data: ${parseError}`
+        );
+      }
+      
+      let sectionToDuplicate: any = null;
+      let insertIndex = elementorData.length;
+      
+      // Find the section to duplicate
+      for (let i = 0; i < elementorData.length; i++) {
+        if (elementorData[i].id === args.section_id && elementorData[i].elType === 'section') {
+          sectionToDuplicate = JSON.parse(JSON.stringify(elementorData[i])); // Deep copy
+          insertIndex = args.position !== undefined ? args.position : i + 1;
+          break;
+        }
+      }
+      
+      if (!sectionToDuplicate) {
+        throw new McpError(
+          ErrorCode.InvalidRequest,
+          `Section ID ${args.section_id} not found`
+        );
+      }
+      
+      // Generate new IDs for the duplicated section and all its children
+      const generateNewIds = (element: any): void => {
+        element.id = Math.random().toString(36).substr(2, 8);
+        if (element.elements) {
+          element.elements.forEach(generateNewIds);
+        }
+      };
+      
+      generateNewIds(sectionToDuplicate);
+      
+      // Insert the duplicated section
+      elementorData.splice(insertIndex, 0, sectionToDuplicate);
+      
+      // Update the page
+      await this.updateElementorData({
+        post_id: args.post_id,
+        elementor_data: JSON.stringify(elementorData)
+      });
+      
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `Section duplicated successfully! New section ID: ${sectionToDuplicate.id}\nInserted at position: ${insertIndex}`,
+          },
+        ],
+      };
+    } catch (error: any) {
+      if (error instanceof McpError) {
+        throw error;
+      }
+      throw new McpError(
+        ErrorCode.InvalidRequest,
+        `Failed to duplicate section: ${error.message}`
+      );
+    }
+  }
+
+  // Widget Addition Tools
+  private async addWidgetToSection(args: { post_id: number; section_id?: string; column_id?: string; widget_type: string; widget_settings?: object; position?: number }) {
+    this.ensureAuthenticated();
+    
+    try {
+      // Get current Elementor data
+      const currentElementorData = await this.getElementorData({ post_id: args.post_id });
+      const currentDataText = currentElementorData.content[0].text;
+      
+      if (currentDataText.includes('No Elementor data found')) {
+        throw new McpError(
+          ErrorCode.InvalidRequest,
+          `No Elementor data found for post/page ID ${args.post_id}`
+        );
+      }
+      
+      let elementorData: any[];
+      try {
+        elementorData = JSON.parse(currentDataText);
+      } catch (parseError) {
+        throw new McpError(
+          ErrorCode.InvalidRequest,
+          `Failed to parse current Elementor data: ${parseError}`
+        );
+      }
+      
+      // Generate unique ID for the widget
+      const widgetId = Math.random().toString(36).substr(2, 8);
+      
+      // Create new widget
+      const newWidget = {
+        id: widgetId,
+        elType: 'widget',
+        widgetType: args.widget_type,
+        isInner: false,
+        settings: args.widget_settings || {},
+        elements: []
+      };
+      
+      let targetFound = false;
+      
+      // Function to find target container and add widget
+      const findAndAddWidget = (elements: any[]): boolean => {
+        for (let element of elements) {
+          // If column_id is specified, look for that specific column
+          if (args.column_id && element.id === args.column_id && element.elType === 'column') {
+            if (args.position !== undefined && args.position >= 0 && args.position < element.elements.length) {
+              element.elements.splice(args.position, 0, newWidget);
+            } else {
+              element.elements.push(newWidget);
+            }
+            return true;
+          }
+          
+          // If section_id is specified, add to first column of that section
+          if (args.section_id && element.id === args.section_id && element.elType === 'section') {
+            if (element.elements && element.elements.length > 0) {
+              const firstColumn = element.elements[0];
+              if (args.position !== undefined && args.position >= 0 && args.position < firstColumn.elements.length) {
+                firstColumn.elements.splice(args.position, 0, newWidget);
+              } else {
+                firstColumn.elements.push(newWidget);
+              }
+              return true;
+            }
+          }
+          
+          // If no specific target, add to first available column
+          if (!args.section_id && !args.column_id && element.elType === 'column') {
+            element.elements.push(newWidget);
+            return true;
+          }
+          
+          // Recursively search
+          if (element.elements && element.elements.length > 0) {
+            if (findAndAddWidget(element.elements)) {
+              return true;
+            }
+          }
+        }
+        return false;
+      };
+      
+      targetFound = findAndAddWidget(elementorData);
+      
+      if (!targetFound) {
+        throw new McpError(
+          ErrorCode.InvalidRequest,
+          `Target container not found (section_id: ${args.section_id}, column_id: ${args.column_id})`
+        );
+      }
+      
+      // Update the page
+      await this.updateElementorData({
+        post_id: args.post_id,
+        elementor_data: JSON.stringify(elementorData)
+      });
+      
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `Widget added successfully! Widget ID: ${widgetId}\nWidget Type: ${args.widget_type}\nPosition: ${args.position || 'end'}`,
+          },
+        ],
+      };
+    } catch (error: any) {
+      if (error instanceof McpError) {
+        throw error;
+      }
+      throw new McpError(
+        ErrorCode.InvalidRequest,
+        `Failed to add widget: ${error.message}`
+      );
+    }
+  }
+
+  private async insertWidgetAtPosition(args: { post_id: number; widget_type: string; widget_settings?: object; target_element_id: string; insert_position?: string }) {
+    this.ensureAuthenticated();
+    
+    try {
+      // Get current Elementor data
+      const currentElementorData = await this.getElementorData({ post_id: args.post_id });
+      const currentDataText = currentElementorData.content[0].text;
+      
+      if (currentDataText.includes('No Elementor data found')) {
+        throw new McpError(
+          ErrorCode.InvalidRequest,
+          `No Elementor data found for post/page ID ${args.post_id}`
+        );
+      }
+      
+      let elementorData: any[];
+      try {
+        elementorData = JSON.parse(currentDataText);
+      } catch (parseError) {
+        throw new McpError(
+          ErrorCode.InvalidRequest,
+          `Failed to parse current Elementor data: ${parseError}`
+        );
+      }
+      
+      // Generate unique ID for the widget
+      const widgetId = Math.random().toString(36).substr(2, 8);
+      
+      // Create new widget
+      const newWidget = {
+        id: widgetId,
+        elType: 'widget',
+        widgetType: args.widget_type,
+        isInner: false,
+        settings: args.widget_settings || {},
+        elements: []
+      };
+      
+      let targetFound = false;
+      
+      // Function to find target element and insert widget
+      const findAndInsertWidget = (elements: any[], parent: any): boolean => {
+        for (let i = 0; i < elements.length; i++) {
+          const element = elements[i];
+          
+          if (element.id === args.target_element_id) {
+            const insertIndex = args.insert_position === 'before' ? i : i + 1;
+            parent.elements.splice(insertIndex, 0, newWidget);
+            return true;
+          }
+          
+          if (element.elements && element.elements.length > 0) {
+            if (findAndInsertWidget(element.elements, element)) {
+              return true;
+            }
+          }
+        }
+        return false;
+      };
+      
+      // Create a mock parent for top-level elements
+      const mockParent = { elements: elementorData };
+      targetFound = findAndInsertWidget(elementorData, mockParent);
+      
+      if (!targetFound) {
+        throw new McpError(
+          ErrorCode.InvalidRequest,
+          `Target element ID ${args.target_element_id} not found`
+        );
+      }
+      
+      // Update the page
+      await this.updateElementorData({
+        post_id: args.post_id,
+        elementor_data: JSON.stringify(elementorData)
+      });
+      
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `Widget inserted successfully! Widget ID: ${widgetId}\nWidget Type: ${args.widget_type}\nInserted ${args.insert_position || 'after'} element: ${args.target_element_id}`,
+          },
+        ],
+      };
+    } catch (error: any) {
+      if (error instanceof McpError) {
+        throw error;
+      }
+      throw new McpError(
+        ErrorCode.InvalidRequest,
+        `Failed to insert widget: ${error.message}`
+      );
+    }
+  }
+
+  private async cloneWidget(args: { post_id: number; widget_id: string; target_element_id?: string; insert_position?: string }) {
+    this.ensureAuthenticated();
+    
+    try {
+      // Get current Elementor data
+      const currentElementorData = await this.getElementorData({ post_id: args.post_id });
+      const currentDataText = currentElementorData.content[0].text;
+      
+      if (currentDataText.includes('No Elementor data found')) {
+        throw new McpError(
+          ErrorCode.InvalidRequest,
+          `No Elementor data found for post/page ID ${args.post_id}`
+        );
+      }
+      
+      let elementorData: any[];
+      try {
+        elementorData = JSON.parse(currentDataText);
+      } catch (parseError) {
+        throw new McpError(
+          ErrorCode.InvalidRequest,
+          `Failed to parse current Elementor data: ${parseError}`
+        );
+      }
+      
+      let widgetToClone: any = null;
+      
+      // Function to find widget to clone
+      const findWidget = (elements: any[]): any => {
+        for (let element of elements) {
+          if (element.id === args.widget_id) {
+            return JSON.parse(JSON.stringify(element)); // Deep copy
+          }
+          
+          if (element.elements && element.elements.length > 0) {
+            const found = findWidget(element.elements);
+            if (found) return found;
+          }
+        }
+        return null;
+      };
+      
+      widgetToClone = findWidget(elementorData);
+      
+      if (!widgetToClone) {
+        throw new McpError(
+          ErrorCode.InvalidRequest,
+          `Widget ID ${args.widget_id} not found`
+        );
+      }
+      
+      // Generate new ID for cloned widget
+      const generateNewIds = (element: any): void => {
+        element.id = Math.random().toString(36).substr(2, 8);
+        if (element.elements) {
+          element.elements.forEach(generateNewIds);
+        }
+      };
+      
+      generateNewIds(widgetToClone);
+      
+      // Insert cloned widget
+      if (args.target_element_id) {
+        // Insert at specific position
+        let targetFound = false;
+        
+        const findAndInsertWidget = (elements: any[], parent: any): boolean => {
+          for (let i = 0; i < elements.length; i++) {
+            const element = elements[i];
+            
+            if (element.id === args.target_element_id) {
+              const insertIndex = args.insert_position === 'before' ? i : i + 1;
+              parent.elements.splice(insertIndex, 0, widgetToClone);
+              return true;
+            }
+            
+            if (element.elements && element.elements.length > 0) {
+              if (findAndInsertWidget(element.elements, element)) {
+                return true;
+              }
+            }
+          }
+          return false;
+        };
+        
+        const mockParent = { elements: elementorData };
+        targetFound = findAndInsertWidget(elementorData, mockParent);
+        
+        if (!targetFound) {
+          throw new McpError(
+            ErrorCode.InvalidRequest,
+            `Target element ID ${args.target_element_id} not found`
+          );
+        }
+      } else {
+        // Add to first available column
+        const findFirstColumn = (elements: any[]): boolean => {
+          for (let element of elements) {
+            if (element.elType === 'column') {
+              element.elements.push(widgetToClone);
+              return true;
+            }
+            
+            if (element.elements && element.elements.length > 0) {
+              if (findFirstColumn(element.elements)) {
+                return true;
+              }
+            }
+          }
+          return false;
+        };
+        
+        if (!findFirstColumn(elementorData)) {
+          throw new McpError(
+            ErrorCode.InvalidRequest,
+            'No column found to place cloned widget'
+          );
+        }
+      }
+      
+      // Update the page
+      await this.updateElementorData({
+        post_id: args.post_id,
+        elementor_data: JSON.stringify(elementorData)
+      });
+      
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `Widget cloned successfully! New widget ID: ${widgetToClone.id}\nOriginal widget ID: ${args.widget_id}`,
+          },
+        ],
+      };
+    } catch (error: any) {
+      if (error instanceof McpError) {
+        throw error;
+      }
+      throw new McpError(
+        ErrorCode.InvalidRequest,
+        `Failed to clone widget: ${error.message}`
+      );
+    }
+  }
+
+  private async moveWidget(args: { post_id: number; widget_id: string; target_section_id?: string; target_column_id?: string; position?: number }) {
+    this.ensureAuthenticated();
+    
+    try {
+      // Get current Elementor data
+      const currentElementorData = await this.getElementorData({ post_id: args.post_id });
+      const currentDataText = currentElementorData.content[0].text;
+      
+      if (currentDataText.includes('No Elementor data found')) {
+        throw new McpError(
+          ErrorCode.InvalidRequest,
+          `No Elementor data found for post/page ID ${args.post_id}`
+        );
+      }
+      
+      let elementorData: any[];
+      try {
+        elementorData = JSON.parse(currentDataText);
+      } catch (parseError) {
+        throw new McpError(
+          ErrorCode.InvalidRequest,
+          `Failed to parse current Elementor data: ${parseError}`
+        );
+      }
+      
+      let widgetToMove: any = null;
+      
+      // Function to find and remove widget
+      const findAndRemoveWidget = (elements: any[]): boolean => {
+        for (let i = 0; i < elements.length; i++) {
+          const element = elements[i];
+          
+          if (element.id === args.widget_id) {
+            widgetToMove = elements.splice(i, 1)[0];
+            return true;
+          }
+          
+          if (element.elements && element.elements.length > 0) {
+            if (findAndRemoveWidget(element.elements)) {
+              return true;
+            }
+          }
+        }
+        return false;
+      };
+      
+      if (!findAndRemoveWidget(elementorData)) {
+        throw new McpError(
+          ErrorCode.InvalidRequest,
+          `Widget ID ${args.widget_id} not found`
+        );
+      }
+      
+      // Function to find target and add widget
+      const findTargetAndAddWidget = (elements: any[]): boolean => {
+        for (let element of elements) {
+          // If column_id is specified, look for that specific column
+          if (args.target_column_id && element.id === args.target_column_id && element.elType === 'column') {
+            if (args.position !== undefined && args.position >= 0 && args.position < element.elements.length) {
+              element.elements.splice(args.position, 0, widgetToMove);
+            } else {
+              element.elements.push(widgetToMove);
+            }
+            return true;
+          }
+          
+          // If section_id is specified, add to first column of that section
+          if (args.target_section_id && element.id === args.target_section_id && element.elType === 'section') {
+            if (element.elements && element.elements.length > 0) {
+              const firstColumn = element.elements[0];
+              if (args.position !== undefined && args.position >= 0 && args.position < firstColumn.elements.length) {
+                firstColumn.elements.splice(args.position, 0, widgetToMove);
+              } else {
+                firstColumn.elements.push(widgetToMove);
+              }
+              return true;
+            }
+          }
+          
+          if (element.elements && element.elements.length > 0) {
+            if (findTargetAndAddWidget(element.elements)) {
+              return true;
+            }
+          }
+        }
+        return false;
+      };
+      
+      if (!findTargetAndAddWidget(elementorData)) {
+        throw new McpError(
+          ErrorCode.InvalidRequest,
+          `Target container not found (section_id: ${args.target_section_id}, column_id: ${args.target_column_id})`
+        );
+      }
+      
+      // Update the page
+      await this.updateElementorData({
+        post_id: args.post_id,
+        elementor_data: JSON.stringify(elementorData)
+      });
+      
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `Widget moved successfully! Widget ID: ${args.widget_id}\nMoved to: ${args.target_column_id || args.target_section_id}\nPosition: ${args.position || 'end'}`,
+          },
+        ],
+      };
+    } catch (error: any) {
+      if (error instanceof McpError) {
+        throw error;
+      }
+      throw new McpError(
+        ErrorCode.InvalidRequest,
+        `Failed to move widget: ${error.message}`
+      );
+    }
+  }
+
+  // Element Management Tools
+  private async deleteElementorElement(args: { post_id: number; element_id: string }) {
+    this.ensureAuthenticated();
+    
+    try {
+      // Get current Elementor data
+      const currentElementorData = await this.getElementorData({ post_id: args.post_id });
+      const currentDataText = currentElementorData.content[0].text;
+      
+      if (currentDataText.includes('No Elementor data found')) {
+        throw new McpError(
+          ErrorCode.InvalidRequest,
+          `No Elementor data found for post/page ID ${args.post_id}`
+        );
+      }
+      
+      let elementorData: any[];
+      try {
+        elementorData = JSON.parse(currentDataText);
+      } catch (parseError) {
+        throw new McpError(
+          ErrorCode.InvalidRequest,
+          `Failed to parse current Elementor data: ${parseError}`
+        );
+      }
+      
+      let elementDeleted = false;
+      
+      // Function to find and delete element
+      const findAndDeleteElement = (elements: any[]): boolean => {
+        for (let i = 0; i < elements.length; i++) {
+          const element = elements[i];
+          
+          if (element.id === args.element_id) {
+            elements.splice(i, 1);
+            return true;
+          }
+          
+          if (element.elements && element.elements.length > 0) {
+            if (findAndDeleteElement(element.elements)) {
+              return true;
+            }
+          }
+        }
+        return false;
+      };
+      
+      elementDeleted = findAndDeleteElement(elementorData);
+      
+      if (!elementDeleted) {
+        throw new McpError(
+          ErrorCode.InvalidRequest,
+          `Element ID ${args.element_id} not found`
+        );
+      }
+      
+      // Update the page
+      await this.updateElementorData({
+        post_id: args.post_id,
+        elementor_data: JSON.stringify(elementorData)
+      });
+      
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `Element deleted successfully! Element ID: ${args.element_id}`,
+          },
+        ],
+      };
+    } catch (error: any) {
+      if (error instanceof McpError) {
+        throw error;
+      }
+      throw new McpError(
+        ErrorCode.InvalidRequest,
+        `Failed to delete element: ${error.message}`
+      );
+    }
+  }
+
+  private async reorderElements(args: { post_id: number; container_id: string; element_ids: string[] }) {
+    this.ensureAuthenticated();
+    
+    try {
+      // Get current Elementor data
+      const currentElementorData = await this.getElementorData({ post_id: args.post_id });
+      const currentDataText = currentElementorData.content[0].text;
+      
+      if (currentDataText.includes('No Elementor data found')) {
+        throw new McpError(
+          ErrorCode.InvalidRequest,
+          `No Elementor data found for post/page ID ${args.post_id}`
+        );
+      }
+      
+      let elementorData: any[];
+      try {
+        elementorData = JSON.parse(currentDataText);
+      } catch (parseError) {
+        throw new McpError(
+          ErrorCode.InvalidRequest,
+          `Failed to parse current Elementor data: ${parseError}`
+        );
+      }
+      
+      let containerFound = false;
+      
+      // Function to find container and reorder elements
+      const findAndReorderElements = (elements: any[]): boolean => {
+        for (let element of elements) {
+          if (element.id === args.container_id) {
+            const oldElements = [...element.elements];
+            const newElements: any[] = [];
+            
+            // Reorder according to provided array
+            for (let elementId of args.element_ids) {
+              const foundElement = oldElements.find(el => el.id === elementId);
+              if (foundElement) {
+                newElements.push(foundElement);
+              }
+            }
+            
+            // Add any elements that weren't in the reorder list
+            for (let oldElement of oldElements) {
+              if (!args.element_ids.includes(oldElement.id)) {
+                newElements.push(oldElement);
+              }
+            }
+            
+            element.elements = newElements;
+            return true;
+          }
+          
+          if (element.elements && element.elements.length > 0) {
+            if (findAndReorderElements(element.elements)) {
+              return true;
+            }
+          }
+        }
+        return false;
+      };
+      
+      containerFound = findAndReorderElements(elementorData);
+      
+      if (!containerFound) {
+        throw new McpError(
+          ErrorCode.InvalidRequest,
+          `Container ID ${args.container_id} not found`
+        );
+      }
+      
+      // Update the page
+      await this.updateElementorData({
+        post_id: args.post_id,
+        elementor_data: JSON.stringify(elementorData)
+      });
+      
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `Elements reordered successfully in container: ${args.container_id}`,
+          },
+        ],
+      };
+    } catch (error: any) {
+      if (error instanceof McpError) {
+        throw error;
+      }
+      throw new McpError(
+        ErrorCode.InvalidRequest,
+        `Failed to reorder elements: ${error.message}`
+      );
+    }
+  }
+
+  private async copyElementSettings(args: { post_id: number; source_element_id: string; target_element_id: string; settings_to_copy?: string[] }) {
+    this.ensureAuthenticated();
+    
+    try {
+      // Get current Elementor data
+      const currentElementorData = await this.getElementorData({ post_id: args.post_id });
+      const currentDataText = currentElementorData.content[0].text;
+      
+      if (currentDataText.includes('No Elementor data found')) {
+        throw new McpError(
+          ErrorCode.InvalidRequest,
+          `No Elementor data found for post/page ID ${args.post_id}`
+        );
+      }
+      
+      let elementorData: any[];
+      try {
+        elementorData = JSON.parse(currentDataText);
+      } catch (parseError) {
+        throw new McpError(
+          ErrorCode.InvalidRequest,
+          `Failed to parse current Elementor data: ${parseError}`
+        );
+      }
+      
+      let sourceElement: any = null;
+      let targetElement: any = null;
+      
+      // Function to find elements
+      const findElement = (elements: any[], elementId: string): any => {
+        for (let element of elements) {
+          if (element.id === elementId) {
+            return element;
+          }
+          
+          if (element.elements && element.elements.length > 0) {
+            const found = findElement(element.elements, elementId);
+            if (found) return found;
+          }
+        }
+        return null;
+      };
+      
+      sourceElement = findElement(elementorData, args.source_element_id);
+      targetElement = findElement(elementorData, args.target_element_id);
+      
+      if (!sourceElement) {
+        throw new McpError(
+          ErrorCode.InvalidRequest,
+          `Source element ID ${args.source_element_id} not found`
+        );
+      }
+      
+      if (!targetElement) {
+        throw new McpError(
+          ErrorCode.InvalidRequest,
+          `Target element ID ${args.target_element_id} not found`
+        );
+      }
+      
+      // Copy settings
+      if (args.settings_to_copy && args.settings_to_copy.length > 0) {
+        // Copy specific settings
+        for (let setting of args.settings_to_copy) {
+          if (sourceElement.settings && sourceElement.settings[setting] !== undefined) {
+            if (!targetElement.settings) targetElement.settings = {};
+            targetElement.settings[setting] = JSON.parse(JSON.stringify(sourceElement.settings[setting]));
+          }
+        }
+      } else {
+        // Copy all settings
+        targetElement.settings = JSON.parse(JSON.stringify(sourceElement.settings || {}));
+      }
+      
+      // Update the page
+      await this.updateElementorData({
+        post_id: args.post_id,
+        elementor_data: JSON.stringify(elementorData)
+      });
+      
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `Settings copied successfully from ${args.source_element_id} to ${args.target_element_id}`,
+          },
+        ],
+      };
+    } catch (error: any) {
+      if (error instanceof McpError) {
+        throw error;
+      }
+      throw new McpError(
+        ErrorCode.InvalidRequest,
+        `Failed to copy element settings: ${error.message}`
+      );
+    }
+  }
+
+  // Page Structure Tools
+  private async getPageStructure(args: { post_id: number; include_settings?: boolean }) {
+    this.ensureAuthenticated();
+    
+    try {
+      // Get current Elementor data
+      const currentElementorData = await this.getElementorData({ post_id: args.post_id });
+      const currentDataText = currentElementorData.content[0].text;
+      
+      if (currentDataText.includes('No Elementor data found')) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `No Elementor data found for post/page ID ${args.post_id}`,
+            },
+          ],
+        };
+      }
+      
+      let elementorData: any[];
+      try {
+        elementorData = JSON.parse(currentDataText);
+      } catch (parseError) {
+        throw new McpError(
+          ErrorCode.InvalidRequest,
+          `Failed to parse Elementor data: ${parseError}`
+        );
+      }
+      
+      // Function to extract structure
+      const extractStructure = (elements: any[], level = 0): any[] => {
+        return elements.map(element => {
+          const structure: any = {
+            id: element.id,
+            type: element.elType,
+            widgetType: element.widgetType || null,
+            level: level
+          };
+          
+          if (args.include_settings && element.settings) {
+            structure.settings = element.settings;
+          }
+          
+          if (element.elements && element.elements.length > 0) {
+            structure.children = extractStructure(element.elements, level + 1);
+          }
+          
+          return structure;
+        });
+      };
+      
+      const structure = extractStructure(elementorData);
+      
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify(structure, null, 2),
+          },
+        ],
+      };
+    } catch (error: any) {
+      if (error instanceof McpError) {
+        throw error;
+      }
+      throw new McpError(
+        ErrorCode.InvalidRequest,
+        `Failed to get page structure: ${error.message}`
+      );
+    }
+  }
+
+  // Performance & Optimization
+  private async clearElementorCacheByPage(args: { post_id: number }) {
+    this.ensureAuthenticated();
+    
+    try {
+      await this.clearElementorCache(args.post_id);
+      
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `Cache cleared successfully for post/page ID: ${args.post_id}`,
+          },
+        ],
+      };
+    } catch (error: any) {
+      throw new McpError(
+        ErrorCode.InvalidRequest,
+        `Failed to clear cache: ${error.message}`
+      );
+    }
+  }
+
+  // Advanced Element Operations
+  private async findElementsByType(args: { post_id: number; widget_type: string; include_settings?: boolean }) {
+    this.ensureAuthenticated();
+    
+    try {
+      // Get current Elementor data
+      const currentElementorData = await this.getElementorData({ post_id: args.post_id });
+      const currentDataText = currentElementorData.content[0].text;
+      
+      if (currentDataText.includes('No Elementor data found')) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `No Elementor data found for post/page ID ${args.post_id}`,
+            },
+          ],
+        };
+      }
+      
+      let elementorData: any[];
+      try {
+        elementorData = JSON.parse(currentDataText);
+      } catch (parseError) {
+        throw new McpError(
+          ErrorCode.InvalidRequest,
+          `Failed to parse Elementor data: ${parseError}`
+        );
+      }
+      
+      const foundElements: any[] = [];
+      
+      // Function to find elements by type
+      const findElementsByTypeRecursive = (elements: any[]): void => {
+        for (let element of elements) {
+          if (element.widgetType === args.widget_type) {
+            const result: any = {
+              id: element.id,
+              widgetType: element.widgetType
+            };
+            
+            if (args.include_settings && element.settings) {
+              result.settings = element.settings;
+            }
+            
+            foundElements.push(result);
+          }
+          
+          if (element.elements && element.elements.length > 0) {
+            findElementsByTypeRecursive(element.elements);
+          }
+        }
+      };
+      
+      findElementsByTypeRecursive(elementorData);
+      
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify(foundElements, null, 2),
+          },
+        ],
+      };
+    } catch (error: any) {
+      if (error instanceof McpError) {
+        throw error;
+      }
+      throw new McpError(
+        ErrorCode.InvalidRequest,
+        `Failed to find elements by type: ${error.message}`
+      );
+    }
+  }
+
+  // Template Management (Requires Elementor Pro)
+  private async createElementorTemplate(args: any) {
+    return {
+      content: [
+        {
+          type: 'text',
+          text: 'Error: Template management requires Elementor Pro API access. This feature is not available in the free version.',
+        },
+      ],
+    };
+  }
+
+  private async applyTemplateToPage(args: any) {
+    return {
+      content: [
+        {
+          type: 'text',
+          text: 'Error: Template management requires Elementor Pro API access. This feature is not available in the free version.',
+        },
+      ],
+    };
+  }
+
+  private async exportElementorTemplate(args: any) {
+    return {
+      content: [
+        {
+          type: 'text',
+          text: 'Error: Template management requires Elementor Pro API access. This feature is not available in the free version.',
+        },
+      ],
+    };
+  }
+
+  private async importElementorTemplate(args: any) {
+    return {
+      content: [
+        {
+          type: 'text',
+          text: 'Error: Template management requires Elementor Pro API access. This feature is not available in the free version.',
+        },
+      ],
+    };
+  }
+
+  // Global Settings (Requires Elementor Pro)
+  private async getElementorGlobalColors(args: any) {
+    return {
+      content: [
+        {
+          type: 'text',
+          text: 'Error: Global settings require Elementor Pro API access. This feature is not available in the free version.',
+        },
+      ],
+    };
+  }
+
+  private async updateElementorGlobalColors(args: any) {
+    return {
+      content: [
+        {
+          type: 'text',
+          text: 'Error: Global settings require Elementor Pro API access. This feature is not available in the free version.',
+        },
+      ],
+    };
+  }
+
+  private async getElementorGlobalFonts(args: any) {
+    return {
+      content: [
+        {
+          type: 'text',
+          text: 'Error: Global settings require Elementor Pro API access. This feature is not available in the free version.',
+        },
+      ],
+    };
+  }
+
+  private async updateElementorGlobalFonts(args: any) {
+    return {
+      content: [
+        {
+          type: 'text',
+          text: 'Error: Global settings require Elementor Pro API access. This feature is not available in the free version.',
+        },
+      ],
+    };
+  }
+
+  // Advanced Operations (Not Yet Implemented)
+  private async rebuildPageStructure(args: any) {
+    return {
+      content: [
+        {
+          type: 'text',
+          text: 'Error: Page structure rebuilding is a complex operation not yet implemented. Please use individual element manipulation tools instead.',
+        },
+      ],
+    };
+  }
+
+  private async validateElementorData(args: any) {
+    return {
+      content: [
+        {
+          type: 'text',
+          text: 'Error: Data validation not yet implemented. Please check data manually using get_elementor_data.',
+        },
+      ],
+    };
+  }
+
+  private async regenerateCSS(args: any) {
+    return {
+      content: [
+        {
+          type: 'text',
+          text: 'Error: CSS regeneration requires direct server access. Please use the Elementor admin interface: Elementor → Tools → Regenerate CSS & Data.',
+        },
+      ],
+    };
+  }
+
+  private async optimizeElementorAssets(args: any) {
+    return {
+      content: [
+        {
+          type: 'text',
+          text: 'Error: Asset optimization requires direct server access. Please use WordPress optimization plugins or the Elementor admin interface.',
+        },
+      ],
+    };
+  }
+
+  private async bulkUpdateWidgetSettings(args: any) {
+    return {
+      content: [
+        {
+          type: 'text',
+          text: 'Error: Bulk widget updates not yet implemented. Please use individual widget update tools or find_elements_by_type to identify widgets first.',
+        },
+      ],
+    };
+  }
+
+  private async replaceWidgetContent(args: any) {
+    return {
+      content: [
+        {
+          type: 'text',
+          text: 'Error: Widget content replacement not yet implemented. Please use individual widget update tools.',
+        },
+      ],
+    };
+  }
+
+  private async getElementorCustomFields(args: any) {
+    return {
+      content: [
+        {
+          type: 'text',
+          text: 'Error: Custom fields integration not yet implemented. Please use WordPress REST API to access custom fields directly.',
+        },
+      ],
+    };
+  }
+
+  private async updateDynamicContentSources(args: any) {
+    return {
+      content: [
+        {
+          type: 'text',
+          text: 'Error: Dynamic content management not yet implemented. Please update widget settings manually with dynamic field configurations.',
+        },
+      ],
+    };
+  }
+
+  private async getElementorRevisions(args: any) {
+    return {
+      content: [
+        {
+          type: 'text',
+          text: 'Error: Revision management not yet implemented. Please use WordPress admin interface to access revisions.',
+        },
+      ],
+    };
+  }
+
+  private async restoreElementorRevision(args: any) {
+    return {
+      content: [
+        {
+          type: 'text',
+          text: 'Error: Revision management not yet implemented. Please use WordPress admin interface to restore revisions.',
+        },
+      ],
+    };
+  }
+
+  private async compareElementorRevisions(args: any) {
+    return {
+      content: [
+        {
+          type: 'text',
+          text: 'Error: Revision management not yet implemented. Please use WordPress admin interface to compare revisions.',
+        },
+      ],
+    };
   }
 
   async run() {

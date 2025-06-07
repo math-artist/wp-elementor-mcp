@@ -1,6 +1,6 @@
 {
   "name": "wp-elementor-mcp",
-  "version": "1.4.0",
+  "version": "1.6.0",
   "description": "MCP server for interacting with Elementor and WordPress through natural language",
   "main": "dist/index.js",
   "bin": {
@@ -17,7 +17,17 @@
     "build": "tsc && chmod +x dist/index.js",
     "dev": "tsc --watch",
     "start": "node dist/index.js",
+    "start:essential": "ELEMENTOR_MINIMAL_MODE=true node dist/index.js",
+    "start:standard": "ELEMENTOR_MCP_MODE=standard node dist/index.js",
+    "start:advanced": "ELEMENTOR_MCP_MODE=advanced node dist/index.js",
+    "start:full": "ELEMENTOR_ENABLE_ALL=true node dist/index.js",
     "test": "node test-server.js",
+    "test:config": "node test-simple.js",
+    "test:modes": "node test-configs.js",
+    "test:comprehensive": "node comprehensive-test.js",
+    "test:validate": "node validation-test.js",
+    "test:summary": "node test-summary.js",
+    "test:all": "npm run test && npm run test:validate && npm run test:comprehensive",
     "prepare": "npm run build",
     "prepublishOnly": "npm run build && npm test"
   },
