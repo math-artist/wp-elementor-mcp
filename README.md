@@ -322,6 +322,16 @@ npm run test:all               # Complete test suite
 
 ⚠️ **Having issues with 404 errors or "No Elementor data found"?** See our comprehensive [TROUBLESHOOTING.md](TROUBLESHOOTING.md) guide for detailed debugging steps and solutions.
 
+### 🔐 SSL Certificate Support 
+
+The MCP server includes **automatic SSL certificate handling** for seamless local development:
+
+- **Local Development**: Automatically allows self-signed certificates for `.local`, `.dev`, `.test`, `localhost`
+- **Production Sites**: Requires valid SSL certificates for security
+- **Zero Configuration**: Works out-of-the-box with popular local development tools
+
+See [SSL-SUPPORT.md](SSL-SUPPORT.md) for complete details.
+
 ### Quick Diagnostic Tools
 ```javascript
 // New! List all posts and pages with Elementor status

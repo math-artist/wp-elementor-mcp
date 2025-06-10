@@ -7,10 +7,11 @@ All notable changes to the WordPress Elementor MCP Server will be documented in 
 ### ✨ Added
 - **New Tool**: `list_all_content` - Content discovery with Elementor status indicators (✅/⚠️/❌)
 - **Enhanced Error Handling**: Much more informative 404 and connection error messages
+- **SSL Certificate Support**: Automatic SSL handling for local development sites (`.local`, `.dev`, `.test`, `localhost`)
 - **Debugging Infrastructure**: Console logging and detailed request information
 - **Connection Diagnostics**: Automatic timeout handling (30s) and enhanced error reporting
 - **Test Suite**: Comprehensive credential testing with real WordPress connections
-- **Documentation**: Added `TROUBLESHOOTING.md` and `CREDENTIAL-TESTING.md` guides
+- **Documentation**: Added `TROUBLESHOOTING.md`, `CREDENTIAL-TESTING.md`, and `SSL-SUPPORT.md` guides
 
 ### 🔧 Improved
 - **WordPress Integration**: Enhanced data retrieval with `context: 'edit'` for full meta access
@@ -21,6 +22,7 @@ All notable changes to the WordPress Elementor MCP Server will be documented in 
 ### 🛠️ Fixed
 - **404 Errors**: Better handling and diagnosis of "Request failed with status code 404"
 - **Missing Elementor Data**: Improved detection and reporting of "No Elementor data found"
+- **SSL Certificate Errors**: Self-signed certificate support for local development environments
 - **Post/Page Discovery**: Enhanced search and filtering capabilities
 - **Connection Issues**: Better error messages for authentication and network problems
 
