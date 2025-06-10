@@ -2,7 +2,7 @@
 
 All notable changes to the WordPress Elementor MCP Server will be documented in this file.
 
-## [1.6.1] - 2024-01-XX
+## [1.6.2] - 2024-12-10
 
 ### ✨ Added
 - **New Tool**: `list_all_content` - Content discovery with Elementor status indicators (✅/⚠️/❌)
@@ -37,6 +37,28 @@ All notable changes to the WordPress Elementor MCP Server will be documented in 
 - Added `test:credentials` script for credential testing
 - Updated tool count validation for new `list_all_content` tool
 - Enhanced test coverage for error scenarios
+
+## [1.6.1] - 2024-12-09
+
+### ✨ Added
+- **New Tool**: `list_all_content` - Content discovery with Elementor status indicators (✅/⚠️/❌)
+- **Enhanced Error Handling**: Much more informative 404 and connection error messages
+- **Debugging Infrastructure**: Console logging and detailed request information
+- **Connection Diagnostics**: Automatic timeout handling (30s) and enhanced error reporting
+- **Test Suite**: Comprehensive credential testing with real WordPress connections
+- **Documentation**: Added `TROUBLESHOOTING.md` and `CREDENTIAL-TESTING.md` guides
+
+### 🔧 Improved
+- **WordPress Integration**: Enhanced data retrieval with `context: 'edit'` for full meta access
+- **Error Messages**: Much more informative debugging information for connection issues
+- **Data Discovery**: Better handling of posts/pages that may not have Elementor data
+- **Connection Setup**: Enhanced axios configuration with timeout and debug logging
+
+### 🛠️ Fixed
+- **404 Errors**: Better handling and diagnosis of "Request failed with status code 404"
+- **Missing Elementor Data**: Improved detection and reporting of "No Elementor data found"
+- **Post/Page Discovery**: Enhanced search and filtering capabilities
+- **Connection Issues**: Better error messages for authentication and network problems
 
 ## [1.6.0] - Previous Release
 
