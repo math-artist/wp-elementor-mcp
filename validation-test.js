@@ -7,10 +7,10 @@ import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
 const VALIDATION_CONFIG = {
   modes: ['essential', 'standard', 'advanced', 'full'],
   expectedToolCounts: {
-    essential: 20,
-    standard: 32,
-    advanced: 34,
-    full: 34
+    essential: 21,  // Added list_all_content
+    standard: 33,   // Added list_all_content
+    advanced: 35,   // Added list_all_content
+    full: 35        // Added list_all_content
   }
 };
 
@@ -298,7 +298,7 @@ function validateInputSchema(tool) {
 
 function classifyTool(toolName) {
   const categories = {
-    'WordPress Core': ['get_posts', 'get_post', 'create_post', 'update_post', 'get_pages', 'create_page', 'update_page', 'get_media', 'upload_media', 'configure_wordpress'],
+    'WordPress Core': ['get_posts', 'get_post', 'create_post', 'update_post', 'get_pages', 'create_page', 'update_page', 'get_media', 'upload_media', 'configure_wordpress', 'list_all_content'],
     'Basic Elementor': ['get_elementor_data', 'update_elementor_data', 'get_elementor_widget', 'update_elementor_widget', 'get_elementor_elements', 'update_elementor_section', 'get_elementor_data_chunked', 'get_elementor_templates'],
     'Section Management': ['create_elementor_section', 'create_elementor_container', 'add_column_to_section', 'duplicate_section'],
     'Widget Operations': ['add_widget_to_section', 'insert_widget_at_position', 'clone_widget', 'move_widget'],
