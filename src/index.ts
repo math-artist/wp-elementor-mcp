@@ -1398,8 +1398,8 @@ class ElementorWordPressMCP {
         url?: string;
       }> = [];
       
-      // Fetch posts for each status
-      for (const status of statuses) {
+      // Fetch posts for all statuses concurrently
+      const fetchPromises = statuses.map(async (status) => {
         try {
           const postsResponse = await this.axiosInstance!.get('posts', {
             params: {
