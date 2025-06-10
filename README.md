@@ -1,6 +1,15 @@
-# Elementor WordPress MCP Server
+# Elementor WordPress MCP Server v1.6.1
 
 A powerful, modular Model Context Protocol (MCP) server for WordPress and Elementor. This server provides AI assistants with scalable capabilities—from basic content management to advanced page building—through an intelligent configuration system.
+
+## 🆕 What's New in v1.6.1
+
+- **Enhanced Error Handling**: Much more informative 404 and connection error messages with debugging information
+- **New Content Discovery Tool**: `list_all_content` - Find all posts/pages with Elementor status indicators (✅/⚠️/❌)
+- **Improved Debugging**: Console logging, connection diagnostics, and detailed request information
+- **Better WordPress Integration**: Enhanced data retrieval with `context: 'edit'` for full meta access
+- **Connection Troubleshooting**: Automatic timeout handling and enhanced error reporting
+- **Comprehensive Test Suite**: Added credential testing with real WordPress connections
 
 ## ✨ Key Features
 
@@ -158,6 +167,7 @@ ELEMENTOR_ENABLE_PERFORMANCE=true
 - `get_posts`, `get_post`, `create_post`, `update_post`
 - `get_pages`, `create_page`, `update_page`
 - `get_media`, `upload_media`
+- `list_all_content` - Content discovery with Elementor status
 
 **Basic Elementor:**
 - `get_elementor_templates`, `get_elementor_data`, `update_elementor_data`
@@ -309,6 +319,17 @@ npm run test:all               # Complete test suite
 - Efficient Data Transfer: Minimal payloads for maximum performance
 
 ## 🔍 Troubleshooting
+
+⚠️ **Having issues with 404 errors or "No Elementor data found"?** See our comprehensive [TROUBLESHOOTING.md](TROUBLESHOOTING.md) guide for detailed debugging steps and solutions.
+
+### Quick Diagnostic Tools
+```javascript
+// New! List all posts and pages with Elementor status
+await mcp.listAllContent({ include_all_statuses: true });
+
+// Debug specific post/page issues
+await mcp.getElementorData({ post_id: 123 });
+```
 
 ### Connection Issues
 ```bash

@@ -212,6 +212,7 @@ function getTestArgumentsForTool(toolName) {
   switch (toolName) {
     case 'get_pages':
     case 'get_media':
+    case 'list_all_content':
       return { per_page: 5 };
       
     case 'create_page':
@@ -329,7 +330,7 @@ function requiresWordPressConnection(toolName) {
     'get_pages', 'create_page', 'update_page',
     'get_media', 'upload_media',
     'get_elementor_elements', 'get_elementor_widget', 'update_elementor_widget',
-    'update_elementor_section', 'get_elementor_data_chunked'
+    'update_elementor_section', 'get_elementor_data_chunked', 'list_all_content'
   ];
   
   return wpConnectionTools.includes(toolName);
