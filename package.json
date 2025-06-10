@@ -1,6 +1,6 @@
 {
   "name": "wp-elementor-mcp",
-  "version": "1.6.0",
+  "version": "1.6.1",
   "description": "MCP server for interacting with Elementor and WordPress through natural language",
   "main": "dist/index.js",
   "bin": {
@@ -26,8 +26,10 @@
     "test:modes": "node test-configs.js",
     "test:comprehensive": "node comprehensive-test.js",
     "test:validate": "node validation-test.js",
+    "test:enhanced": "node test-enhanced-features.js",
     "test:summary": "node test-summary.js",
-    "test:all": "npm run test && npm run test:validate && npm run test:comprehensive",
+    "test:credentials": "node test-with-credentials.js",
+    "test:all": "npm run test && npm run test:validate && npm run test:enhanced && npm run test:comprehensive",
     "prepare": "npm run build",
     "prepublishOnly": "npm run build && npm test"
   },

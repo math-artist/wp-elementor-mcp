@@ -68,13 +68,45 @@ class ElementorWordPressMCP {
 
   private setupAxios(config: WordPressConfig) {
     const auth = Base64.encode(`${config.username}:${config.applicationPassword}`);
+    const baseURL = `${config.baseUrl}/wp-json/wp/v2/`;
+    
+    console.error(`Setting up WordPress connection to: ${baseURL}`);
+    console.error(`Username: ${config.username}`);
+    
     this.axiosInstance = axios.create({
-      baseURL: `${config.baseUrl}/wp-json/wp/v2/`,
+      baseURL,
       headers: {
         'Authorization': `Basic ${auth}`,
         'Content-Type': 'application/json',
       },
+      timeout: 30000, // 30 second timeout
     });
+    
+    // Add request interceptor for debugging
+    this.axiosInstance.interceptors.request.use(
+      (config) => {
+        console.error(`Making request to: ${config.method?.toUpperCase()} ${config.url}`);
+        return config;
+      },
+      (error) => {
+        console.error(`Request error: ${error.message}`);
+        return Promise.reject(error);
+      }
+    );
+    
+    // Add response interceptor for debugging
+    this.axiosInstance.interceptors.response.use(
+      (response) => {
+        console.error(`Response received: ${response.status} ${response.statusText}`);
+        return response;
+      },
+      (error) => {
+        console.error(`Response error: ${error.response?.status} ${error.response?.statusText}`);
+        console.error(`Error details: ${error.response?.data?.message || error.message}`);
+        return Promise.reject(error);
+      }
+    );
+    
     this.config = config;
   }
 
@@ -227,6 +259,25 @@ class ElementorWordPressMCP {
                   type: 'string',
                   description: 'Page status (publish, draft, private, etc.)',
                   default: 'publish',
+                },
+              },
+            },
+          },
+          {
+            name: 'list_all_content',
+            description: 'List all posts and pages with their IDs and Elementor status for debugging',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                per_page: {
+                  type: 'number',
+                  description: 'Number of items to retrieve per type (default: 50)',
+                  default: 50,
+                },
+                include_all_statuses: {
+                  type: 'boolean',
+                  description: 'Include draft, private, and trashed content (default: false)',
+                  default: false,
                 },
               },
             },
@@ -957,6 +1008,8 @@ class ElementorWordPressMCP {
             return await this.updatePost(args as any);
           case 'get_pages':
             return await this.getPages(args as any);
+          case 'list_all_content':
+            return await this.listAllContent(args as any);
           case 'create_page':
             return await this.createPage(args as any);
           case 'update_page':
@@ -1148,22 +1201,52 @@ class ElementorWordPressMCP {
     const params: any = {
       per_page: args.per_page || 10,
       status: args.status || 'publish',
+      context: 'edit' // Get full data including meta
     };
     
     if (args.search) {
       params.search = args.search;
     }
 
-    const response = await this.axiosInstance!.get('posts', { params });
-    
-    return {
-      content: [
-        {
-          type: 'text',
-          text: JSON.stringify(response.data, null, 2),
-        },
-      ],
-    };
+    try {
+      console.error(`Fetching posts with params: ${JSON.stringify(params)}`);
+      const response = await this.axiosInstance!.get('posts', { params });
+      
+      // Enhanced response with debugging info
+      const posts = response.data;
+      let debugInfo = `Found ${posts.length} posts\n`;
+      
+      // Add summary of posts with Elementor data detection
+      posts.forEach((post: any, index: number) => {
+        const hasElementorData = post.meta && post.meta._elementor_data;
+        const hasElementorEditMode = post.meta && post.meta._elementor_edit_mode;
+        debugInfo += `${index + 1}. ID: ${post.id}, Title: "${post.title.rendered}", Status: ${post.status}`;
+        if (hasElementorData) {
+          debugInfo += ` ✅ Elementor`;
+        } else if (hasElementorEditMode) {
+          debugInfo += ` ⚠️ Elementor (no data)`;
+        }
+        debugInfo += `\n`;
+      });
+      
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `${debugInfo}\n--- Full JSON Response ---\n${JSON.stringify(posts, null, 2)}`,
+          },
+        ],
+      };
+    } catch (error: any) {
+      console.error(`Error fetching posts: ${error.response?.status} - ${error.response?.statusText}`);
+      console.error(`URL: ${error.config?.url}`);
+      console.error(`Headers: ${JSON.stringify(error.config?.headers)}`);
+      
+      throw new McpError(
+        ErrorCode.InvalidRequest,
+        `Failed to fetch posts: ${error.response?.status} ${error.response?.statusText} - ${error.response?.data?.message || error.message}`
+      );
+    }
   }
 
   private async getPost(args: { id: number }) {
@@ -1253,18 +1336,196 @@ class ElementorWordPressMCP {
     const params = {
       per_page: args.per_page || 10,
       status: args.status || 'publish',
+      context: 'edit' // Get full data including meta
     };
 
-    const response = await this.axiosInstance!.get('pages', { params });
+    try {
+      console.error(`Fetching pages with params: ${JSON.stringify(params)}`);
+      const response = await this.axiosInstance!.get('pages', { params });
+      
+      // Enhanced response with debugging info
+      const pages = response.data;
+      let debugInfo = `Found ${pages.length} pages\n`;
+      
+      // Add summary of pages with Elementor data detection
+      pages.forEach((page: any, index: number) => {
+        const hasElementorData = page.meta && page.meta._elementor_data;
+        const hasElementorEditMode = page.meta && page.meta._elementor_edit_mode;
+        debugInfo += `${index + 1}. ID: ${page.id}, Title: "${page.title.rendered}", Status: ${page.status}`;
+        if (hasElementorData) {
+          debugInfo += ` ✅ Elementor`;
+        } else if (hasElementorEditMode) {
+          debugInfo += ` ⚠️ Elementor (no data)`;
+        }
+        debugInfo += `\n`;
+      });
+      
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `${debugInfo}\n--- Full JSON Response ---\n${JSON.stringify(pages, null, 2)}`,
+          },
+        ],
+      };
+    } catch (error: any) {
+      console.error(`Error fetching pages: ${error.response?.status} - ${error.response?.statusText}`);
+      console.error(`URL: ${error.config?.url}`);
+      console.error(`Headers: ${JSON.stringify(error.config?.headers)}`);
+      
+      throw new McpError(
+        ErrorCode.InvalidRequest,
+        `Failed to fetch pages: ${error.response?.status} ${error.response?.statusText} - ${error.response?.data?.message || error.message}`
+      );
+         }
+   }
+
+  private async listAllContent(args: { per_page?: number; include_all_statuses?: boolean }) {
+    this.ensureAuthenticated();
     
-    return {
-      content: [
-        {
-          type: 'text',
-          text: JSON.stringify(response.data, null, 2),
+    try {
+      const perPage = args.per_page || 50;
+      const statuses = args.include_all_statuses ? ['publish', 'draft', 'private', 'trash'] : ['publish'];
+      
+      console.error(`Listing all content with per_page: ${perPage}, statuses: ${statuses.join(', ')}`);
+      
+      let allContent: Array<{
+        id: number;
+        title: string;
+        type: 'post' | 'page';
+        status: string;
+        elementor_status: 'full' | 'partial' | 'none';
+        url?: string;
+      }> = [];
+      
+      // Fetch posts for each status
+      for (const status of statuses) {
+        try {
+          const postsResponse = await this.axiosInstance!.get('posts', {
+            params: {
+              per_page: perPage,
+              status,
+              context: 'edit'
+            }
+          });
+          
+          postsResponse.data.forEach((post: any) => {
+            const hasElementorData = post.meta?._elementor_data;
+            const hasElementorEditMode = post.meta?._elementor_edit_mode;
+            
+            let elementorStatus: 'full' | 'partial' | 'none' = 'none';
+            if (hasElementorData) {
+              elementorStatus = 'full';
+            } else if (hasElementorEditMode === 'builder') {
+              elementorStatus = 'partial';
+            }
+            
+            allContent.push({
+              id: post.id,
+              title: post.title.rendered || '(No title)',
+              type: 'post',
+              status: post.status,
+              elementor_status: elementorStatus,
+              url: post.link
+            });
+          });
+        } catch (error: any) {
+          console.error(`Failed to fetch posts with status ${status}: ${error.message}`);
+        }
+      }
+      
+      // Fetch pages for each status
+      for (const status of statuses) {
+        try {
+          const pagesResponse = await this.axiosInstance!.get('pages', {
+            params: {
+              per_page: perPage,
+              status,
+              context: 'edit'
+            }
+          });
+          
+          pagesResponse.data.forEach((page: any) => {
+            const hasElementorData = page.meta?._elementor_data;
+            const hasElementorEditMode = page.meta?._elementor_edit_mode;
+            
+            let elementorStatus: 'full' | 'partial' | 'none' = 'none';
+            if (hasElementorData) {
+              elementorStatus = 'full';
+            } else if (hasElementorEditMode === 'builder') {
+              elementorStatus = 'partial';
+            }
+            
+            allContent.push({
+              id: page.id,
+              title: page.title.rendered || '(No title)',
+              type: 'page',
+              status: page.status,
+              elementor_status: elementorStatus,
+              url: page.link
+            });
+          });
+        } catch (error: any) {
+          console.error(`Failed to fetch pages with status ${status}: ${error.message}`);
+        }
+      }
+      
+      // Sort by ID
+      allContent.sort((a, b) => a.id - b.id);
+      
+      // Generate summary
+      const summary = {
+        total: allContent.length,
+        by_type: {
+          posts: allContent.filter(item => item.type === 'post').length,
+          pages: allContent.filter(item => item.type === 'page').length
         },
-      ],
-    };
+        by_elementor_status: {
+          full: allContent.filter(item => item.elementor_status === 'full').length,
+          partial: allContent.filter(item => item.elementor_status === 'partial').length,
+          none: allContent.filter(item => item.elementor_status === 'none').length
+        },
+        by_status: {} as Record<string, number>
+      };
+      
+      // Count by status
+      allContent.forEach(item => {
+        summary.by_status[item.status] = (summary.by_status[item.status] || 0) + 1;
+      });
+      
+      // Format output
+      let output = `📊 Content Summary\n`;
+      output += `Total items: ${summary.total}\n`;
+      output += `Posts: ${summary.by_type.posts}, Pages: ${summary.by_type.pages}\n`;
+      output += `Elementor: Full (${summary.by_elementor_status.full}), Partial (${summary.by_elementor_status.partial}), None (${summary.by_elementor_status.none})\n`;
+      output += `Statuses: ${Object.entries(summary.by_status).map(([status, count]) => `${status} (${count})`).join(', ')}\n\n`;
+      
+      output += `📋 Content List\n`;
+      output += `${'ID'.padEnd(6)} ${'Type'.padEnd(5)} ${'Status'.padEnd(8)} ${'Elementor'.padEnd(9)} Title\n`;
+      output += `${'─'.repeat(6)} ${'─'.repeat(5)} ${'─'.repeat(8)} ${'─'.repeat(9)} ${'─'.repeat(50)}\n`;
+      
+      allContent.forEach(item => {
+        const elementorIcon = item.elementor_status === 'full' ? '✅' : item.elementor_status === 'partial' ? '⚠️' : '❌';
+        const title = item.title.length > 45 ? item.title.substring(0, 42) + '...' : item.title;
+        output += `${item.id.toString().padEnd(6)} ${item.type.padEnd(5)} ${item.status.padEnd(8)} ${(elementorIcon + ' ' + item.elementor_status).padEnd(9)} ${title}\n`;
+      });
+      
+      return {
+        content: [
+          {
+            type: 'text',
+            text: output,
+          },
+        ],
+      };
+      
+    } catch (error: any) {
+      console.error(`Error listing all content: ${error.message}`);
+      throw new McpError(
+        ErrorCode.InvalidRequest,
+        `Failed to list content: ${error.response?.status} ${error.response?.statusText} - ${error.response?.data?.message || error.message}`
+      );
+    }
   }
 
   private async createPage(args: {
@@ -1374,26 +1635,52 @@ class ElementorWordPressMCP {
     this.ensureAuthenticated();
     
     try {
+      console.error(`Getting Elementor data for ID: ${args.post_id}`);
+      
       // Try to get as post first, then as page if that fails
       let response;
       let postType = 'post';
+      let debugInfo = '';
       
       try {
+        console.error(`Trying to fetch as post: posts/${args.post_id}`);
         response = await this.axiosInstance!.get(`posts/${args.post_id}`, {
           params: { context: 'edit' }
         });
+        debugInfo += `Found as post (ID: ${args.post_id})\n`;
       } catch (postError: any) {
+        console.error(`Post fetch failed: ${postError.response?.status} - ${postError.response?.statusText}`);
+        
         if (postError.response?.status === 404) {
           // Try as page
           try {
+            console.error(`Trying to fetch as page: pages/${args.post_id}`);
             response = await this.axiosInstance!.get(`pages/${args.post_id}`, {
               params: { context: 'edit' }
             });
             postType = 'page';
+            debugInfo += `Found as page (ID: ${args.post_id})\n`;
           } catch (pageError: any) {
+            console.error(`Page fetch failed: ${pageError.response?.status} - ${pageError.response?.statusText}`);
+            
+            // Provide comprehensive error message
+            const errorDetails = `
+❌ Post/Page ID ${args.post_id} not found
+
+Debug Information:
+- Tried as post: ${postError.response?.status} ${postError.response?.statusText}
+- Tried as page: ${pageError.response?.status} ${pageError.response?.statusText}
+
+Suggestions:
+1. Verify the ID exists by running get_posts or get_pages
+2. Check if the ID might be a custom post type
+3. Ensure the post/page is not trashed
+4. Verify your user permissions include access to this content
+            `;
+            
             throw new McpError(
               ErrorCode.InvalidRequest,
-              `Post/Page ID ${args.post_id} not found in posts or pages`
+              errorDetails.trim()
             );
           }
         } else {
@@ -1401,26 +1688,78 @@ class ElementorWordPressMCP {
         }
       }
       
-      // Try to get Elementor data from meta
-      const elementorData = response.data.meta?._elementor_data;
+      // Analyze the response for Elementor data
+      const data = response.data;
+      console.error(`Response received for ${postType} ${args.post_id}`);
+      console.error(`Meta keys available: ${data.meta ? Object.keys(data.meta).join(', ') : 'None'}`);
       
-      return {
-        content: [
-          {
-            type: 'text',
-            text: elementorData 
-              ? JSON.stringify(JSON.parse(elementorData), null, 2)
-              : `No Elementor data found for this ${postType} (ID: ${args.post_id}).`,
-          },
-        ],
-      };
+      const elementorData = data.meta?._elementor_data;
+      const elementorEditMode = data.meta?._elementor_edit_mode;
+      const elementorVersion = data.meta?._elementor_version;
+      const elementorPageSettings = data.meta?._elementor_page_settings;
+      
+      debugInfo += `Title: "${data.title.rendered}"\n`;
+      debugInfo += `Status: ${data.status}\n`;
+      debugInfo += `Type: ${postType}\n`;
+      debugInfo += `Edit Mode: ${elementorEditMode || 'None'}\n`;
+      debugInfo += `Version: ${elementorVersion || 'None'}\n`;
+      debugInfo += `Has Page Settings: ${elementorPageSettings ? 'Yes' : 'No'}\n`;
+      debugInfo += `Has Elementor Data: ${elementorData ? 'Yes' : 'No'}\n`;
+      
+      if (elementorData) {
+        try {
+          const parsedData = JSON.parse(elementorData);
+          debugInfo += `Elementor Elements Count: ${Array.isArray(parsedData) ? parsedData.length : 'Not an array'}\n`;
+          
+          return {
+            content: [
+              {
+                type: 'text',
+                text: `${debugInfo}\n--- Elementor Data ---\n${JSON.stringify(parsedData, null, 2)}`,
+              },
+            ],
+          };
+        } catch (parseError) {
+          debugInfo += `⚠️ Elementor data found but failed to parse JSON\n`;
+          return {
+            content: [
+              {
+                type: 'text',
+                text: `${debugInfo}\n--- Raw Elementor Data ---\n${elementorData}`,
+              },
+            ],
+          };
+        }
+      } else {
+        // Check if this is an Elementor page without data
+        if (elementorEditMode === 'builder') {
+          debugInfo += `\n⚠️ This appears to be an Elementor page but has no data.\n`;
+          debugInfo += `Possible reasons:\n`;
+          debugInfo += `- Empty Elementor page\n`;
+          debugInfo += `- Cache/synchronization issue\n`;
+          debugInfo += `- Elementor data stored differently\n`;
+        } else {
+          debugInfo += `\n❌ This ${postType} does not use Elementor builder.\n`;
+        }
+        
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `${debugInfo}\n--- Available Meta Keys ---\n${data.meta ? JSON.stringify(Object.keys(data.meta), null, 2) : 'No meta data available'}`,
+            },
+          ],
+        };
+      }
     } catch (error: any) {
       if (error instanceof McpError) {
         throw error;
       }
+      
+      console.error(`Unexpected error getting Elementor data: ${error.message}`);
       throw new McpError(
         ErrorCode.InvalidRequest,
-        `Failed to get Elementor data: ${error.response?.data?.message || error.message}`
+        `Failed to get Elementor data: ${error.response?.status} ${error.response?.statusText} - ${error.response?.data?.message || error.message}`
       );
     }
   }
