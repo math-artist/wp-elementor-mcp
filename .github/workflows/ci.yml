@@ -2,7 +2,7 @@ name: CI
 
 on:
   pull_request:
-    branches: [ main ]
+    branches: [ main, develop ]  # Run on PRs to both main and develop
   push:
     branches: [ develop ]
 
@@ -34,6 +34,7 @@ jobs:
       run: |
         npm run test
         npm run test:validate
+        npm run test:enhanced
 
     - name: Check TypeScript compilation
       run: npx tsc --noEmit

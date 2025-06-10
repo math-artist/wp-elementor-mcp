@@ -31,6 +31,7 @@ jobs:
         npm run build
         npm run test
         npm run test:validate
+        npm run test:enhanced
 
   publish:
     needs: test
