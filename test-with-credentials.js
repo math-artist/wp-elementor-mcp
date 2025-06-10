@@ -104,7 +104,7 @@ function runTestWithCredentials(testType = 'all') {
     }
 
     console.log(`${description} with WordPress credentials...\n`);
-    console.log('=' .repeat(80));
+    console.log("=".repeat(80));
 
     const testProcess = spawn(command[0], command.slice(1), {
       stdio: 'inherit',
