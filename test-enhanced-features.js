@@ -200,6 +200,30 @@ async function testEnhancedFeature(client, testCase, mode, availableTools) {
 }
 
 function validateEnhancedFeatureResult(testCase, result, hadError, errorMessage) {
+  // Helper function to parse structured response
+  const parseStructuredResponse = (result) => {
+    if (!result || !result.content || !result.content[0] || !result.content[0].text) {
+      return { isValid: false, error: 'Invalid response structure' };
+    }
+    
+    try {
+      const parsedResponse = JSON.parse(result.content[0].text);
+      return { 
+        isValid: true, 
+        status: parsedResponse.status, 
+        data: parsedResponse.data, 
+        message: parsedResponse.message 
+      };
+    } catch (parseError) {
+      // Fallback for legacy responses
+      return { 
+        isValid: false, 
+        error: 'Response is not structured JSON',
+        rawText: result.content[0].text 
+      };
+    }
+  };
+
   switch (testCase.name) {
     case 'list_all_content_schema_validation':
     case 'list_all_content_with_all_statuses':
@@ -217,43 +241,77 @@ function validateEnhancedFeatureResult(testCase, result, hadError, errorMessage)
         return { success: false, message: `Unexpected error: ${errorMessage}` };
       }
       
-      // If no error, validate the response structure
-      if (!result || !result.content || !result.content[0] || !result.content[0].text) {
-        return { success: false, message: 'Invalid response structure' };
+      // Parse the structured response
+      const listResponse = parseStructuredResponse(result);
+      if (!listResponse.isValid) {
+        return { success: false, message: listResponse.error || 'Invalid response structure' };
       }
       
-      const text = result.content[0].text;
-      
-      // Should contain summary information
-      if (!text.includes('Content Summary') && !text.includes('Total items')) {
-        return { success: false, message: 'Missing expected summary format' };
+      // Validate successful response structure
+      if (listResponse.status !== 'success') {
+        return { 
+          success: false, 
+          message: `Expected success status, got: ${listResponse.status}` 
+        };
       }
       
-      return { success: true, message: 'Valid list_all_content response structure' };
+      // Validate data structure for list_all_content
+      if (!listResponse.data || !listResponse.data.summary || !listResponse.data.content) {
+        return { 
+          success: false, 
+          message: 'Missing expected data structure (summary, content)' 
+        };
+      }
       
-         case 'get_elementor_data_enhanced_error':
-       if (!hadError) {
-         return { success: false, message: 'Expected error for non-existent post ID' };
-       }
-       
-       // Without WordPress connection, we expect connection errors
-       if (errorMessage.includes('WordPress connection not configured') ||
-           errorMessage.includes('ECONNREFUSED')) {
-         return { 
-           success: true, 
-           message: 'Expected connection error (enhanced error handling would work with WordPress)' 
-         };
-       }
-       
-       // Check for enhanced error message features (if connection worked)
-       if (errorMessage.includes('Debug Information') ||
-           errorMessage.includes('Suggestions') ||
-           errorMessage.includes('Tried as post') ||
-           errorMessage.includes('not found')) {
-         return { success: true, message: 'Enhanced error message detected' };
-       }
-       
-       return { success: false, message: 'Error message not enhanced as expected' };
+      // Check for expected summary fields
+      const summary = listResponse.data.summary;
+      if (!summary.total || !summary.by_type || !summary.by_elementor_status) {
+        return { 
+          success: false, 
+          message: 'Missing expected summary fields (total, by_type, by_elementor_status)' 
+        };
+      }
+      
+      return { success: true, message: 'Valid list_all_content structured response' };
+      
+    case 'get_elementor_data_enhanced_error':
+      if (hadError) {
+        // Without WordPress connection, we expect connection errors
+        if (errorMessage.includes('WordPress connection not configured') ||
+            errorMessage.includes('ECONNREFUSED')) {
+          return { 
+            success: true, 
+            message: 'Expected connection error (enhanced error handling would work with WordPress)' 
+          };
+        }
+        
+        // Check for enhanced error message features (if connection worked)
+        if (errorMessage.includes('Debug Information') ||
+            errorMessage.includes('Suggestions') ||
+            errorMessage.includes('Tried as post') ||
+            errorMessage.includes('not found')) {
+          return { success: true, message: 'Enhanced error message detected' };
+        }
+        
+        return { success: false, message: 'Error message not enhanced as expected' };
+      }
+      
+      // If no error was thrown, check if we got a structured error response
+      const errorResponse = parseStructuredResponse(result);
+      if (errorResponse.isValid && errorResponse.status === 'error') {
+        // Validate it's a proper error response for non-existent post
+        const errorData = errorResponse.data;
+        if (errorData.message && 
+            (errorData.message.includes('not found') || 
+             errorData.message.includes('99999') ||
+             errorData.code === 'POST_PAGE_NOT_FOUND' ||
+             errorData.code === 'GET_ELEMENTOR_DATA_ERROR')) {
+          return { success: true, message: 'Valid structured error response for non-existent post' };
+        }
+        return { success: false, message: 'Error response but not for expected reason' };
+      }
+      
+      return { success: false, message: 'Expected error response for non-existent post ID' };
       
     case 'get_posts_enhanced_debug':
     case 'get_pages_enhanced_debug':
@@ -269,19 +327,38 @@ function validateEnhancedFeatureResult(testCase, result, hadError, errorMessage)
         return { success: false, message: `Unexpected error: ${errorMessage}` };
       }
       
-      // If no error, check for debug information
-      if (!result || !result.content || !result.content[0] || !result.content[0].text) {
-        return { success: false, message: 'Invalid response structure' };
+      // Parse the structured response
+      const debugResponse = parseStructuredResponse(result);
+      if (!debugResponse.isValid) {
+        return { success: false, message: debugResponse.error || 'Invalid response structure' };
       }
       
-      const debugText = result.content[0].text;
-      
-      // Should contain enhanced debug information
-      if (!debugText.includes('Found') || !debugText.includes('Elementor')) {
-        return { success: false, message: 'Missing expected debug information' };
+      // Validate successful response structure
+      if (debugResponse.status !== 'success') {
+        return { 
+          success: false, 
+          message: `Expected success status, got: ${debugResponse.status}` 
+        };
       }
       
-      return { success: true, message: 'Enhanced debug information detected' };
+      // Validate enhanced debug information
+      if (!debugResponse.data || !debugResponse.data.summary) {
+        return { 
+          success: false, 
+          message: 'Missing expected debug data structure' 
+        };
+      }
+      
+      // Check for enhanced debug content
+      const debugSummary = debugResponse.data.summary;
+      if (!debugSummary.includes('Found') || !debugSummary.includes('Elementor')) {
+        return { 
+          success: false, 
+          message: 'Missing expected debug information (Found X posts/pages with Elementor status)' 
+        };
+      }
+      
+      return { success: true, message: 'Enhanced debug information detected in structured response' };
       
     default:
       return { success: false, message: 'Unknown test case' };

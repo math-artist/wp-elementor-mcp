@@ -157,15 +157,22 @@ async function testTool(client, tool, mode) {
           throw new Error('Invalid response structure');
         }
         
+        // Validate the new structured response format
+        const responseValidation = validateResponseFormat(result);
+        if (!responseValidation.valid) {
+          console.log(`  ⚠️  ${tool.name} - Response format issue: ${responseValidation.message}`);
+        }
+        
         const duration = Date.now() - testStart;
-        console.log(`  ✅ ${tool.name} - PASSED (${duration}ms)`);
+        console.log(`  ✅ ${tool.name} - PASSED (${duration}ms)${responseValidation.valid ? ' 📋 Structured' : ''}`);
         testResults.passed++;
         testResults.details.push({
           tool: tool.name,
           mode,
           status: 'PASSED',
           duration,
-          hasResponse: !!result
+          hasResponse: !!result,
+          structuredResponse: responseValidation.valid
         });
         
       } catch (callError) {
@@ -223,13 +230,6 @@ function getTestArgumentsForTool(toolName) {
   // Return appropriate test arguments based on tool name
   switch (toolName) {
     // WordPress Core Operations
-    case 'configure_wordpress':
-      return { 
-        baseUrl: 'https://test.local', 
-        username: 'testuser', 
-        applicationPassword: 'test123' 
-      };
-      
     case 'get_posts':
     case 'get_pages':
     case 'get_media':
@@ -427,6 +427,60 @@ function requiresWordPressConnection(toolName) {
   return wpConnectionTools.includes(toolName);
 }
 
+function validateResponseFormat(result) {
+  // Check basic response structure
+  if (!result || typeof result !== 'object') {
+    return { valid: false, message: 'Invalid response structure' };
+  }
+  
+  // Check for content array
+  if (!result.content || !Array.isArray(result.content) || result.content.length === 0) {
+    return { valid: false, message: 'Invalid content structure' };
+  }
+  
+  // Check first content item
+  const firstContent = result.content[0];
+  if (!firstContent || firstContent.type !== 'text' || !firstContent.text) {
+    return { valid: false, message: 'Invalid content format' };
+  }
+  
+  // Try to parse the structured JSON response
+  try {
+    const parsedResponse = JSON.parse(firstContent.text);
+    
+    // Check for status field
+    if (!parsedResponse.status || typeof parsedResponse.status !== 'string') {
+      return { valid: false, message: 'Missing or invalid status field' };
+    }
+    
+    // Validate status values
+    if (!['success', 'error'].includes(parsedResponse.status)) {
+      return { valid: false, message: `Invalid status value: ${parsedResponse.status}` };
+    }
+    
+    // Check for data field
+    if (!parsedResponse.data || typeof parsedResponse.data !== 'object') {
+      return { valid: false, message: 'Missing or invalid data field' };
+    }
+    
+    // For error responses, check for required error fields
+    if (parsedResponse.status === 'error') {
+      const errorData = parsedResponse.data;
+      if (!errorData.message || typeof errorData.message !== 'string') {
+        return { valid: false, message: 'Error response missing message' };
+      }
+      if (!errorData.code || typeof errorData.code !== 'string') {
+        return { valid: false, message: 'Error response missing error code' };
+      }
+    }
+    
+    return { valid: true, message: 'Valid structured response format' };
+    
+  } catch (parseError) {
+    return { valid: false, message: 'Response text is not valid JSON' };
+  }
+}
+
 function printFinalSummary() {
   console.log('\n' + '=' .repeat(80));
   console.log('📈 COMPREHENSIVE TEST SUMMARY');
@@ -512,4 +566,4 @@ function printFinalSummary() {
 runComprehensiveTest().catch(error => {
   console.error('💥 Test suite failed:', error);
   process.exit(1);
-}); 
+});

@@ -103,26 +103,16 @@ export WORDPRESS_USERNAME="your_username"
 export WORDPRESS_APPLICATION_PASSWORD="xxxx xxxx xxxx xxxx xxxx xxxx"
 ```
 
-#### Use Manual Configuration
-```javascript
-await mcp.configureWordPress({
-  baseUrl: "https://yoursite.com",
-  username: "your_username", 
-  applicationPassword: "xxxx xxxx xxxx xxxx xxxx xxxx"
-});
-```
-
 ## Debugging Workflow
 
-### Step 1: Test Basic Connection
-```javascript
-// Configure connection (if not using env vars)
-await mcp.configureWordPress({
-  baseUrl: "https://yoursite.com",
-  username: "your_username",
-  applicationPassword: "your_app_password"
-});
+### Step 1: Verify Environment Variables
+Ensure your WordPress connection is configured via environment variables:
+```bash
+export WORDPRESS_BASE_URL="https://yoursite.com"
+export WORDPRESS_USERNAME="your_username"
+export WORDPRESS_APPLICATION_PASSWORD="xxxx xxxx xxxx xxxx xxxx xxxx"
 ```
+Then restart your MCP server.
 
 ### Step 2: List All Content
 ```javascript

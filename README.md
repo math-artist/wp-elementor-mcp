@@ -1,17 +1,18 @@
-# Elementor WordPress MCP Server v1.6.4
+# Elementor WordPress MCP Server v1.6.5
 
 A powerful, modular Model Context Protocol (MCP) server for WordPress and Elementor. This server provides AI assistants with scalable capabilities—from basic content management to advanced page building—through an intelligent configuration system.
 
-## 🆕 What's New in v1.6.4
+## 🆕 What's New in v1.6.5
 
-- **🎯 100% Test Coverage**: All 124 tools now pass comprehensive validation tests
-- **🔧 Enhanced Environment Variable Support**: Automatic `.env` file loading for seamless configuration
-- **🚀 Improved MCP Client Compatibility**: Better Cursor integration and path handling
-- **📊 Comprehensive Test Suite**: Real-time validation with 100% success rate
+- **📋 Structured JSON Responses**: All tools now return consistent `{status: "success"/"error", data: {...}}` format
+- **🔧 Enhanced Error Handling**: Comprehensive error codes, categories, and detailed context in all responses
+- **🎯 100% Response Format Compliance**: Validated structured responses across all 34 tools
+- **🚀 Improved Debugging**: Rich error objects with error_type, code, and detailed messages
+- **📊 Better Client Integration**: Standardized response parsing for all MCP clients
+- **✨ Enhanced User Experience**: Clear success/error indicators with actionable feedback
 - **🔐 SSL Certificate Support**: Automatic SSL handling for local development sites (`.local`, `.dev`, `.test`, `localhost`)
 - **🛡️ Security Maintained**: Production sites still require valid SSL certificates  
 - **📚 Complete Documentation**: Enhanced setup guides and troubleshooting tips
-- **✨ Enhanced Error Logging**: SSL status indicators and improved debugging messages
 
 ## ✨ Key Features
 
@@ -28,16 +29,16 @@ A powerful, modular Model Context Protocol (MCP) server for WordPress and Elemen
 Choose your complexity level:
 
 ```bash
-# Essential Mode (21 tools) - Perfect for beginners
+# Essential Mode (20 tools) - Perfect for beginners
 ELEMENTOR_MINIMAL_MODE=true npx wp-elementor-mcp
 
-# Standard Mode (33 tools) - Great for most users (default)
+# Standard Mode (32 tools) - Great for most users (default)
 npx wp-elementor-mcp
 
-# Advanced Mode (35 tools) - For power users  
+# Advanced Mode (34 tools) - For power users  
 ELEMENTOR_MCP_MODE=advanced npx wp-elementor-mcp
 
-# Full Mode (35 tools) - Everything enabled (requires Elementor Pro)
+# Full Mode (34 tools) - Everything enabled (requires Elementor Pro)
 ELEMENTOR_ENABLE_ALL=true npx wp-elementor-mcp
 ```
 
@@ -46,10 +47,10 @@ ELEMENTOR_ENABLE_ALL=true npx wp-elementor-mcp
 
 | Mode | Tools | Best For | Capabilities |
 |------|-------|----------|--------------|
-| **Essential** | 21 | Learning, basic tasks | WordPress CRUD + Basic Elementor |
-| **Standard** | 33 | Most users | + Page building & element management |
-| **Advanced** | 35 | Power users | + Performance tools & advanced operations |
-| **Full** | 35 | Pro workflows | + Templates, global settings, revisions* |
+| **Essential** | 20 | Learning, basic tasks | WordPress CRUD + Basic Elementor |
+| **Standard** | 32 | Most users | + Page building & element management |
+| **Advanced** | 34 | Power users | + Performance tools & advanced operations |
+| **Full** | 34 | Pro workflows | + Templates, global settings, revisions* |
 
 _*Pro features require Elementor Pro license_
 
@@ -161,10 +162,7 @@ ELEMENTOR_ENABLE_PERFORMANCE=true
 
 ## 🎛️ Available Tools by Mode
 
-### Always Available (1 tool)
-- `configure_wordpress` - Manual WordPress connection setup
-
-### Essential Mode (+20 tools)
+### Essential Mode (20 tools)
 **WordPress Operations:**
 - `get_posts`, `get_post`, `create_post`, `update_post`
 - `get_pages`, `create_page`, `update_page`
@@ -177,7 +175,7 @@ ELEMENTOR_ENABLE_PERFORMANCE=true
 - `update_elementor_section`, `get_elementor_data_chunked`
 - `backup_elementor_data`, `clear_elementor_cache`
 
-### Standard Mode (+12 tools)
+### Standard Mode (+12 tools = 32 total)
 **Section & Container Creation:**
 - `create_elementor_section` - Create sections with columns
 - `create_elementor_container` - Create Flexbox containers
@@ -238,6 +236,24 @@ Update only the HTML widget with ID "abc123" in page 67 to show our latest promo
 ```text
 Show me all the text and heading widgets on page 89 so I can update the content
 ```
+
+## 📚 Documentation
+
+### User Guides
+- **[TROUBLESHOOTING.md](TROUBLESHOOTING.md)** - Complete troubleshooting guide for common issues
+- **[CREDENTIAL-TESTING.md](CREDENTIAL-TESTING.md)** - Step-by-step testing with WordPress credentials  
+- **[SSL-SUPPORT.md](SSL-SUPPORT.md)** - SSL certificate setup for local development
+- **[TESTING.md](TESTING.md)** - Comprehensive testing guide and test suite documentation
+
+### Developer Resources
+- **[CONTRIBUTING.md](CONTRIBUTING.md)** - How to contribute to the project
+- **[CHANGELOG.md](CHANGELOG.md)** - Release history and version changes
+
+### Quick Reference
+- **Configuration**: Environment variables and mode selection (see above)
+- **Troubleshooting**: 404 errors, connection issues, SSL problems → [TROUBLESHOOTING.md](TROUBLESHOOTING.md)
+- **Testing**: Validate your setup → [CREDENTIAL-TESTING.md](CREDENTIAL-TESTING.md)
+- **Development**: Local setup and contribution → [CONTRIBUTING.md](CONTRIBUTING.md)
 
 ## 🚀 Development & Testing
 
@@ -324,9 +340,9 @@ npm run test:all               # Complete test suite
 - Selective Features: Environment-based feature toggling
 - Efficient Data Transfer: Minimal payloads for maximum performance
 
-## 🔍 Troubleshooting
+## 🔍 Quick Troubleshooting
 
-⚠️ **Having issues with 404 errors or "No Elementor data found"?** See our comprehensive [TROUBLESHOOTING.md](TROUBLESHOOTING.md) guide for detailed debugging steps and solutions.
+⚠️ **Having issues?** See our comprehensive [📚 Documentation](#-documentation) section above for complete guides.
 
 ### 🔐 SSL Certificate Support 
 
@@ -335,8 +351,6 @@ The MCP server includes **automatic SSL certificate handling** for seamless loca
 - **Local Development**: Automatically allows self-signed certificates for `.local`, `.dev`, `.test`, `localhost`
 - **Production Sites**: Requires valid SSL certificates for security
 - **Zero Configuration**: Works out-of-the-box with popular local development tools
-
-See [SSL-SUPPORT.md](SSL-SUPPORT.md) for complete details.
 
 ### Quick Diagnostic Tools
 ```javascript

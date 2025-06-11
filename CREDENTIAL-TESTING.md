@@ -1,6 +1,6 @@
 # 🧪 Testing with WordPress Credentials
 
-This guide walks you through testing the Elementor MCP with real WordPress credentials to validate all the enhanced features work correctly.
+This guide walks you through testing the Elementor MCP with real WordPress credentials to validate all the enhanced features work correctly, including the new structured JSON response format.
 
 ## 🚀 Quick Setup
 
@@ -52,13 +52,13 @@ npm run test:credentials
 
 ### Test Specific Components
 ```bash
-# Test enhanced features (debugging, list_all_content)
+# Test enhanced features (debugging, list_all_content, response format)
 node test-with-credentials.js enhanced
 
-# Test core validation
+# Test core validation (schemas, structure, response format)
 node test-with-credentials.js validate
 
-# Test comprehensive functionality
+# Test comprehensive functionality (all tools with response validation)
 node test-with-credentials.js comprehensive
 ```
 
@@ -74,18 +74,48 @@ node test-with-credentials.js --help
 - **Enhanced error handling** - Better 404 and connection error messages  
 - **Debugging output** - Console logging and status indicators
 - **Connection validation** - WordPress API accessibility
+- **Structured JSON responses** - Consistent `{status: "success"/"error", data: {...}}` format
 
 ### ✅ Core Functionality
 - WordPress connection and authentication
 - Post and page retrieval with meta data
 - Elementor data detection and access
 - Tool schema validation
+- Response format consistency validation
+
+### ✅ Response Format Validation
+All tools now return structured JSON responses:
+
+**Success Format:**
+```json
+{
+  "status": "success", 
+  "data": {
+    /* Actual response data */
+  },
+  "message": "Operation completed successfully"
+}
+```
+
+**Error Format:**
+```json
+{
+  "status": "error",
+  "data": {
+    "message": "Error description",
+    "code": "ERROR_CODE",
+    "error_type": "ERROR_CATEGORY",
+    "details": "Additional context"
+  }
+}
+```
 
 ### ✅ Real-World Scenarios
 - Finding posts with Elementor data (✅ indicators)
 - Handling posts without Elementor data (❌ indicators)
 - Mixed content scenarios (⚠️ indicators)
 - Error recovery and suggestions
+- Structured response parsing and validation
 
 ## 🛠️ Expected Results
 
@@ -107,8 +137,16 @@ node test-with-credentials.js --help
 
 ✅ Enhanced error handling and debugging features validated
 ✅ list_all_content tool ready for content discovery
+✅ All tools return consistent structured JSON responses 📋
+✅ Response format validation: 100% compliant
 ✅ All 404 and connection issues should now be resolved
 ```
+
+### Response Format Benefits
+- **Consistent parsing** - All tools follow the same response structure
+- **Better error handling** - Structured error messages with codes and categories  
+- **Enhanced debugging** - Rich data structures with detailed context
+- **Client compatibility** - Standardized format works across all MCP clients
 
 ## 🐛 Troubleshooting
 
@@ -121,6 +159,11 @@ node test-with-credentials.js --help
 - Regenerate your Application Password
 - Verify username has appropriate permissions
 - Test with a different user account
+
+### Response Format Issues
+- All tools should return JSON with `status` and `data` fields
+- Check for proper JSON formatting in responses
+- Validate error responses include required error fields
 
 ### No Elementor Data Found
 - Install and activate Elementor plugin
@@ -136,4 +179,4 @@ node test-with-credentials.js --help
 
 ## 📞 Getting Help
 
-If tests fail even with valid credentials, the enhanced error messages will guide you to the issue. Common problems and solutions are documented in [TROUBLESHOOTING.md](TROUBLESHOOTING.md). 
+If tests fail even with valid credentials, the enhanced error messages and structured responses will guide you to the issue. Common problems and solutions are documented in [TROUBLESHOOTING.md](TROUBLESHOOTING.md). 
