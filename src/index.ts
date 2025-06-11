@@ -46,7 +46,7 @@ class ElementorWordPressMCP {
     this.server = new Server(
       {
         name: 'elementor-wordpress-mcp',
-        version: '1.6.2',
+        version: '1.6.4',
       }
     );
 
@@ -80,13 +80,12 @@ class ElementorWordPressMCP {
   }
 
   private setupAxios(config: WordPressConfig) {
-    const auth = Base64.encode(`${config.username}:${config.applicationPassword}`);
-    const baseURL = `${config.baseUrl}/wp-json/wp/v2/`;
+    const baseURL = config.baseUrl.endsWith('/') 
+      ? `${config.baseUrl}wp-json/wp/v2/`
+      : `${config.baseUrl}/wp-json/wp/v2/`;
+      
+    const auth = Buffer.from(`${config.username}:${config.applicationPassword}`).toString('base64');
     
-    console.error(`Setting up WordPress connection to: ${baseURL}`);
-    console.error(`Username: ${config.username}`);
-    
-    // Create HTTPS agent for handling SSL certificates
     const httpsAgent = new https.Agent({
       rejectUnauthorized: this.shouldRejectUnauthorized(config.baseUrl)
     });
@@ -98,13 +97,18 @@ class ElementorWordPressMCP {
         'Content-Type': 'application/json',
       },
       httpsAgent: httpsAgent,
-      timeout: 30000, // 30 second timeout
+      timeout: 60000, // Increased to 60 second timeout for large operations
+      maxContentLength: 50 * 1024 * 1024, // 50MB response limit
+      maxBodyLength: 10 * 1024 * 1024, // 10MB request limit
     });
     
     // Add request interceptor for debugging
     this.axiosInstance.interceptors.request.use(
       (config) => {
         console.error(`Making request to: ${config.method?.toUpperCase()} ${config.url}`);
+        if (config.data && typeof config.data === 'string' && config.data.length > 1000) {
+          console.error(`Request data size: ${config.data.length} characters`);
+        }
         return config;
       },
       (error) => {
@@ -113,15 +117,30 @@ class ElementorWordPressMCP {
       }
     );
     
-    // Add response interceptor for debugging
+    // Add response interceptor for debugging and error handling
     this.axiosInstance.interceptors.response.use(
       (response) => {
         console.error(`Response received: ${response.status} ${response.statusText}`);
+        if (response.data && typeof response.data === 'string' && response.data.length > 10000) {
+          console.error(`Response data size: ${response.data.length} characters`);
+        } else if (response.data && Array.isArray(response.data)) {
+          console.error(`Response array length: ${response.data.length} items`);
+        }
         return response;
       },
       (error) => {
-        console.error(`Response error: ${error.response?.status} ${error.response?.statusText}`);
-        console.error(`Error details: ${error.response?.data?.message || error.message}`);
+        // Enhanced error logging
+        if (error.code === 'ECONNABORTED') {
+          console.error(`🕐 Request timeout: ${error.message}`);
+        } else if (error.response?.status) {
+          console.error(`❌ HTTP Error: ${error.response.status} ${error.response.statusText}`);
+          console.error(`URL: ${error.config?.url}`);
+          if (error.response.data?.message) {
+            console.error(`WordPress Error: ${error.response.data.message}`);
+          }
+        } else {
+          console.error(`🔥 Network/Connection Error: ${error.message}`);
+        }
         return Promise.reject(error);
       }
     );
@@ -161,6 +180,59 @@ class ElementorWordPressMCP {
         ErrorCode.InvalidRequest,
         'WordPress connection not configured. Please set environment variables (WORDPRESS_BASE_URL, WORDPRESS_USERNAME, WORDPRESS_APPLICATION_PASSWORD) or use the configure_wordpress tool.'
       );
+    }
+  }
+
+  // Utility method to handle large responses with better error reporting
+  private async safeApiCall<T>(operation: () => Promise<T>, operationName: string, context: string = ''): Promise<T> {
+    try {
+      const startTime = Date.now();
+      console.error(`🚀 Starting ${operationName}${context ? ` for ${context}` : ''}`);
+      
+      const result = await operation();
+      
+      const duration = Date.now() - startTime;
+      console.error(`✅ Completed ${operationName} in ${duration}ms`);
+      
+      return result;
+    } catch (error: any) {
+      console.error(`❌ Failed ${operationName}${context ? ` for ${context}` : ''}`);
+      
+      if (error.code === 'ECONNABORTED') {
+        console.error(`🕐 Operation timed out after 60 seconds`);
+        throw new McpError(
+          ErrorCode.InvalidRequest,
+          `Request timeout: ${operationName} took longer than 60 seconds. This often indicates the data is too large or the server is overloaded.`
+        );
+      } else if (error.response?.status >= 500) {
+        console.error(`🔥 Server error: ${error.response.status} ${error.response.statusText}`);
+        throw new McpError(
+          ErrorCode.InvalidRequest,
+          `Server error during ${operationName}: ${error.response.status} ${error.response.statusText}. The WordPress server may be overloaded or misconfigured.`
+        );
+      } else if (error.response?.status === 413) {
+        console.error(`📦 Payload too large`);
+        throw new McpError(
+          ErrorCode.InvalidRequest,
+          `Request payload too large for ${operationName}. Try breaking the operation into smaller chunks.`
+        );
+      } else if (error.message?.includes('maxContentLength')) {
+        console.error(`📦 Response too large`);
+        throw new McpError(
+          ErrorCode.InvalidRequest,
+          `Response too large for ${operationName}. The data exceeds 50MB limit. Try using chunked operations or filtering the request.`
+        );
+      } else {
+        // Re-throw the original error if it's already an McpError
+        if (error instanceof McpError) {
+          throw error;
+        }
+        
+        throw new McpError(
+          ErrorCode.InvalidRequest,
+          `Failed ${operationName}: ${error.response?.data?.message || error.message}`
+        );
+      }
     }
   }
 
@@ -1762,7 +1834,7 @@ class ElementorWordPressMCP {
   private async getElementorData(args: { post_id: number }) {
     this.ensureAuthenticated();
     
-    try {
+    return this.safeApiCall(async () => {
       console.error(`Getting Elementor data for ID: ${args.post_id}`);
       
       // Try to get as post first, then as page if that fails
@@ -1879,17 +1951,7 @@ Suggestions:
           ],
         };
       }
-    } catch (error: any) {
-      if (error instanceof McpError) {
-        throw error;
-      }
-      
-      console.error(`Unexpected error getting Elementor data: ${error.message}`);
-      throw new McpError(
-        ErrorCode.InvalidRequest,
-        `Failed to get Elementor data: ${error.response?.status} ${error.response?.statusText} - ${error.response?.data?.message || error.message}`
-      );
-    }
+    }, 'getElementorData', `post/page ID ${args.post_id}`);
   }
 
   private async clearElementorCache(postId?: number) {
@@ -2280,25 +2342,63 @@ Visit the page to confirm changes are visible. If not, the cache clearing was in
     this.ensureAuthenticated();
     
     try {
-      // Get current Elementor data
-      const currentElementorData = await this.getElementorData({ post_id: args.post_id });
-      const currentDataText = currentElementorData.content[0].text;
+      console.error(`🔍 Getting widget ${args.widget_id} from post ID: ${args.post_id}`);
       
-      if (currentDataText.includes('No Elementor data found')) {
+      // Get current Elementor data with improved error handling
+      let currentElementorData;
+      try {
+        currentElementorData = await this.getElementorData({ post_id: args.post_id });
+      } catch (dataError: any) {
+        console.error(`❌ Failed to get Elementor data: ${dataError.message}`);
         throw new McpError(
           ErrorCode.InvalidRequest,
-          `No Elementor data found for post/page ID ${args.post_id}`
+          `Failed to retrieve Elementor data for post/page ID ${args.post_id}: ${dataError.message}`
         );
       }
       
-      // Parse current data
-      let elementorData: any[];
-      try {
-        elementorData = JSON.parse(currentDataText);
-      } catch (parseError) {
+      const currentDataText = currentElementorData.content[0].text;
+      console.error(`📄 Widget search data text length: ${currentDataText.length} characters`);
+      
+      if (currentDataText.includes('No Elementor data found') || currentDataText.includes('does not use Elementor builder')) {
         throw new McpError(
           ErrorCode.InvalidRequest,
-          `Failed to parse current Elementor data: ${parseError}`
+          `No Elementor data found for post/page ID ${args.post_id}. Cannot search for widget ${args.widget_id}.`
+        );
+      }
+      
+      // Extract JSON data from response
+      let jsonMatch;
+      if (currentDataText.includes('--- Elementor Data ---')) {
+        const jsonPart = currentDataText.split('--- Elementor Data ---')[1];
+        if (jsonPart) {
+          jsonMatch = jsonPart.trim();
+        }
+      } else {
+        // Try to find JSON directly
+        jsonMatch = currentDataText;
+      }
+      
+      // Parse current data with better error handling
+      let elementorData: any[];
+      try {
+        if (!jsonMatch || jsonMatch.trim() === '') {
+          throw new Error('No JSON data found in response');
+        }
+        
+        elementorData = JSON.parse(jsonMatch);
+        
+        if (!Array.isArray(elementorData)) {
+          throw new Error('Elementor data is not an array');
+        }
+        
+        console.error(`✅ Successfully parsed data, searching through ${elementorData.length} top-level elements for widget ${args.widget_id}`);
+      } catch (parseError: any) {
+        console.error(`❌ Widget Search Parse Error: ${parseError.message}`);
+        console.error(`📄 Attempted to parse: ${jsonMatch?.substring(0, 200)}...`);
+        
+        throw new McpError(
+          ErrorCode.InvalidRequest,
+          `Failed to parse Elementor data for post/page ID ${args.post_id}. Error: ${parseError.message}. Cannot search for widget ${args.widget_id}.`
         );
       }
       
@@ -2351,25 +2451,73 @@ Visit the page to confirm changes are visible. If not, the cache clearing was in
     this.ensureAuthenticated();
     
     try {
-      // Get current Elementor data
-      const currentElementorData = await this.getElementorData({ post_id: args.post_id });
-      const currentDataText = currentElementorData.content[0].text;
+      console.error(`🔍 Getting Elementor elements for ID: ${args.post_id}`);
       
-      if (currentDataText.includes('No Elementor data found')) {
+      // Get current Elementor data with improved error handling
+      let currentElementorData;
+      try {
+        currentElementorData = await this.getElementorData({ post_id: args.post_id });
+      } catch (dataError: any) {
+        console.error(`❌ Failed to get Elementor data: ${dataError.message}`);
         throw new McpError(
           ErrorCode.InvalidRequest,
-          `No Elementor data found for post/page ID ${args.post_id}`
+          `Failed to retrieve Elementor data for post/page ID ${args.post_id}: ${dataError.message}`
         );
       }
       
-      // Parse current data
+      const currentDataText = currentElementorData.content[0].text;
+      console.error(`📄 Data text length: ${currentDataText.length} characters`);
+      
+      if (currentDataText.includes('No Elementor data found') || currentDataText.includes('does not use Elementor builder')) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify({ 
+                post_id: args.post_id,
+                error: 'No Elementor data found',
+                message: `Post/page ID ${args.post_id} does not contain Elementor data or is not built with Elementor`,
+                total_elements: 0,
+                elements: [] 
+              }, null, 2),
+            },
+          ],
+        };
+      }
+      
+      // Extract JSON data from response
+      let jsonMatch;
+      if (currentDataText.includes('--- Elementor Data ---')) {
+        const jsonPart = currentDataText.split('--- Elementor Data ---')[1];
+        if (jsonPart) {
+          jsonMatch = jsonPart.trim();
+        }
+      } else {
+        // Try to find JSON directly
+        jsonMatch = currentDataText;
+      }
+      
+      // Parse current data with better error handling
       let elementorData: any[];
       try {
-        elementorData = JSON.parse(currentDataText);
-      } catch (parseError) {
+        if (!jsonMatch || jsonMatch.trim() === '') {
+          throw new Error('No JSON data found in response');
+        }
+        
+        elementorData = JSON.parse(jsonMatch);
+        
+        if (!Array.isArray(elementorData)) {
+          throw new Error('Elementor data is not an array');
+        }
+        
+        console.error(`✅ Successfully parsed ${elementorData.length} top-level elements`);
+      } catch (parseError: any) {
+        console.error(`❌ JSON Parse Error: ${parseError.message}`);
+        console.error(`📄 Attempted to parse: ${jsonMatch?.substring(0, 200)}...`);
+        
         throw new McpError(
           ErrorCode.InvalidRequest,
-          `Failed to parse current Elementor data: ${parseError}`
+          `Failed to parse Elementor data for post/page ID ${args.post_id}. Error: ${parseError.message}. This may indicate corrupted data or an unsupported Elementor format.`
         );
       }
       
@@ -3187,24 +3335,65 @@ Backup Details:
     this.ensureAuthenticated();
     
     try {
-      // Get current Elementor data
-      const currentElementorData = await this.getElementorData({ post_id: args.post_id });
-      const currentDataText = currentElementorData.content[0].text;
+      console.error(`➕ Adding widget ${args.widget_type} to post ID: ${args.post_id}`);
+      if (args.section_id) console.error(`📍 Target section: ${args.section_id}`);
+      if (args.column_id) console.error(`📍 Target column: ${args.column_id}`);
       
-      if (currentDataText.includes('No Elementor data found')) {
+      // Get current Elementor data with improved error handling and timeout handling
+      let currentElementorData;
+      try {
+        console.error(`🔄 Fetching Elementor data for widget addition...`);
+        currentElementorData = await this.getElementorData({ post_id: args.post_id });
+      } catch (dataError: any) {
+        console.error(`❌ Failed to get Elementor data: ${dataError.message}`);
         throw new McpError(
           ErrorCode.InvalidRequest,
-          `No Elementor data found for post/page ID ${args.post_id}`
+          `Failed to retrieve Elementor data for post/page ID ${args.post_id}: ${dataError.message}. Cannot add widget.`
         );
+      }
+      
+      const currentDataText = currentElementorData.content[0].text;
+      console.error(`📄 Widget addition data text length: ${currentDataText.length} characters`);
+      
+      if (currentDataText.includes('No Elementor data found') || currentDataText.includes('does not use Elementor builder')) {
+        throw new McpError(
+          ErrorCode.InvalidRequest,
+          `No Elementor data found for post/page ID ${args.post_id}. Cannot add widget to a non-Elementor page.`
+        );
+      }
+      
+      // Extract JSON data from response with better handling
+      let jsonMatch;
+      if (currentDataText.includes('--- Elementor Data ---')) {
+        const jsonPart = currentDataText.split('--- Elementor Data ---')[1];
+        if (jsonPart) {
+          jsonMatch = jsonPart.trim();
+        }
+      } else {
+        // Try to find JSON directly
+        jsonMatch = currentDataText;
       }
       
       let elementorData: any[];
       try {
-        elementorData = JSON.parse(currentDataText);
-      } catch (parseError) {
+        if (!jsonMatch || jsonMatch.trim() === '') {
+          throw new Error('No JSON data found in response');
+        }
+        
+        elementorData = JSON.parse(jsonMatch);
+        
+        if (!Array.isArray(elementorData)) {
+          throw new Error('Elementor data is not an array');
+        }
+        
+        console.error(`✅ Successfully parsed data for widget addition: ${elementorData.length} top-level elements`);
+      } catch (parseError: any) {
+        console.error(`❌ Widget Addition Parse Error: ${parseError.message}`);
+        console.error(`📄 Attempted to parse: ${jsonMatch?.substring(0, 200)}...`);
+        
         throw new McpError(
           ErrorCode.InvalidRequest,
-          `Failed to parse current Elementor data: ${parseError}`
+          `Failed to parse Elementor data for post/page ID ${args.post_id}. Error: ${parseError.message}. Cannot add widget to corrupted data.`
         );
       }
       
@@ -3941,29 +4130,89 @@ Backup Details:
     this.ensureAuthenticated();
     
     try {
-      // Get current Elementor data
-      const currentElementorData = await this.getElementorData({ post_id: args.post_id });
-      const currentDataText = currentElementorData.content[0].text;
+      console.error(`🏗️ Getting page structure for ID: ${args.post_id}`);
       
-      if (currentDataText.includes('No Elementor data found')) {
+      // Get current Elementor data with improved error handling
+      let currentElementorData;
+      try {
+        currentElementorData = await this.getElementorData({ post_id: args.post_id });
+      } catch (dataError: any) {
+        console.error(`❌ Failed to get Elementor data: ${dataError.message}`);
         return {
           content: [
             {
               type: 'text',
-              text: `No Elementor data found for post/page ID ${args.post_id}`,
+              text: JSON.stringify({
+                post_id: args.post_id,
+                error: 'Failed to retrieve data',
+                message: `Could not get Elementor data for post/page ID ${args.post_id}: ${dataError.message}`,
+                structure: []
+              }, null, 2),
             },
           ],
         };
       }
       
+      const currentDataText = currentElementorData.content[0].text;
+      console.error(`📄 Structure data text length: ${currentDataText.length} characters`);
+      
+      if (currentDataText.includes('No Elementor data found') || currentDataText.includes('does not use Elementor builder')) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify({
+                post_id: args.post_id,
+                message: `Post/page ID ${args.post_id} does not contain Elementor data or is not built with Elementor`,
+                structure: []
+              }, null, 2),
+            },
+          ],
+        };
+      }
+      
+      // Extract JSON data from response
+      let jsonMatch;
+      if (currentDataText.includes('--- Elementor Data ---')) {
+        const jsonPart = currentDataText.split('--- Elementor Data ---')[1];
+        if (jsonPart) {
+          jsonMatch = jsonPart.trim();
+        }
+      } else {
+        // Try to find JSON directly
+        jsonMatch = currentDataText;
+      }
+      
       let elementorData: any[];
       try {
-        elementorData = JSON.parse(currentDataText);
-      } catch (parseError) {
-        throw new McpError(
-          ErrorCode.InvalidRequest,
-          `Failed to parse Elementor data: ${parseError}`
-        );
+        if (!jsonMatch || jsonMatch.trim() === '') {
+          throw new Error('No JSON data found in response');
+        }
+        
+        elementorData = JSON.parse(jsonMatch);
+        
+        if (!Array.isArray(elementorData)) {
+          throw new Error('Elementor data is not an array');
+        }
+        
+        console.error(`✅ Successfully parsed structure for ${elementorData.length} top-level elements`);
+      } catch (parseError: any) {
+        console.error(`❌ Structure Parse Error: ${parseError.message}`);
+        console.error(`📄 Attempted to parse: ${jsonMatch?.substring(0, 200)}...`);
+        
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify({
+                post_id: args.post_id,
+                error: 'Parse error',
+                message: `Failed to parse Elementor data: ${parseError.message}`,
+                structure: []
+              }, null, 2),
+            },
+          ],
+        };
       }
       
       // Function to extract structure

@@ -2,6 +2,27 @@
 
 All notable changes to the WordPress Elementor MCP Server will be documented in this file.
 
+## [1.6.4] - 2024-12-19
+
+### 🔧 MCP Client Fixes
+- **Response Size Limits**: Added 50MB response limit and 10MB request limit to axios configuration
+- **Enhanced Timeout Handling**: Increased timeout to 60 seconds for large operations with better error reporting
+- **Improved Error Handling**: Added comprehensive error handling for timeouts, server errors, and large responses
+- **Better Data Parsing**: Enhanced JSON parsing with detailed error messages for Elementor data operations
+- **Diagnostic Logging**: Added extensive debug logging for troubleshooting MCP client issues
+- **Safe API Calls**: Implemented `safeApiCall` utility for consistent error handling across all operations
+
+### 🐛 Bug Fixes
+- **getElementorElements**: Fixed parsing errors and added graceful fallbacks for corrupted data
+- **getPageStructure**: Improved error handling and response formatting
+- **getElementorWidget**: Enhanced widget search with better error messages
+- **addWidgetToSection**: Fixed timeout issues and added detailed progress logging
+
+### 📊 Improvements
+- **Response Monitoring**: Added response size logging for large data operations
+- **Network Error Handling**: Improved handling of connection timeouts and server errors
+- **Data Validation**: Enhanced validation for Elementor data structure before processing
+
 ## [1.6.3] - 2025-06-10
 
 ### 🧹 Maintenance
