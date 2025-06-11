@@ -1,5 +1,17 @@
 #!/usr/bin/env node
 
+// Load environment variables from .env file
+import { config } from 'dotenv';
+import { dirname, join } from 'path';
+import { fileURLToPath } from 'url';
+
+// Get the directory of this script for .env file path
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const envPath = join(__dirname, '..', '.env');
+
+config({ path: envPath });
+
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import {
@@ -1285,16 +1297,37 @@ class ElementorWordPressMCP {
   private async getPost(args: { id: number }) {
     this.ensureAuthenticated();
     
-    const response = await this.axiosInstance!.get(`posts/${args.id}`);
-    
-    return {
-      content: [
-        {
-          type: 'text',
-          text: JSON.stringify(response.data, null, 2),
-        },
-      ],
-    };
+    try {
+      console.error(`Fetching post with ID: ${args.id}`);
+      const response = await this.axiosInstance!.get(`posts/${args.id}`, {
+        params: { context: 'edit' }
+      });
+      
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify(response.data, null, 2),
+          },
+        ],
+      };
+    } catch (error: any) {
+      console.error(`Error fetching post ${args.id}: ${error.response?.status} - ${error.response?.statusText}`);
+      console.error(`URL: ${error.config?.url}`);
+      console.error(`Headers: ${JSON.stringify(error.config?.headers)}`);
+      
+      if (error.response?.status === 404) {
+        throw new McpError(
+          ErrorCode.InvalidRequest,
+          `Post with ID ${args.id} not found. The post may have been deleted, be in trash, or may not exist.`
+        );
+      }
+      
+      throw new McpError(
+        ErrorCode.InvalidRequest,
+        `Failed to fetch post ${args.id}: ${error.response?.status} ${error.response?.statusText} - ${error.response?.data?.message || error.message}`
+      );
+    }
   }
 
   private async createPost(args: {
@@ -1312,12 +1345,14 @@ class ElementorWordPressMCP {
       ...(args.excerpt && { excerpt: args.excerpt }),
     };
 
-    const response = await this.axiosInstance!.post('posts', postData);
-    
-    // Clear Elementor cache after creating post
-    await this.clearElementorCache(response.data.id);
-    
-          return {
+    try {
+      console.error(`Creating post with title: "${args.title}"`);
+      const response = await this.axiosInstance!.post('posts', postData);
+      
+      // Clear Elementor cache after creating post
+      await this.clearElementorCache(response.data.id);
+      
+      return {
         content: [
           {
             type: 'text',
@@ -1328,6 +1363,16 @@ class ElementorWordPressMCP {
           },
         ],
       };
+    } catch (error: any) {
+      console.error(`Error creating post: ${error.response?.status} - ${error.response?.statusText}`);
+      console.error(`URL: ${error.config?.url}`);
+      console.error(`Headers: ${JSON.stringify(error.config?.headers)}`);
+      
+      throw new McpError(
+        ErrorCode.InvalidRequest,
+        `Failed to create post: ${error.response?.status} ${error.response?.statusText} - ${error.response?.data?.message || error.message}`
+      );
+    }
   }
 
   private async updatePost(args: {
@@ -1345,12 +1390,14 @@ class ElementorWordPressMCP {
     if (args.status) updateData.status = args.status;
     if (args.excerpt) updateData.excerpt = args.excerpt;
 
-    const response = await this.axiosInstance!.post(`posts/${args.id}`, updateData);
-    
-    // Clear Elementor cache after updating post
-    await this.clearElementorCache(args.id);
-    
-          return {
+    try {
+      console.error(`Updating post ID: ${args.id}`);
+      const response = await this.axiosInstance!.post(`posts/${args.id}`, updateData);
+      
+      // Clear Elementor cache after updating post
+      await this.clearElementorCache(args.id);
+      
+      return {
         content: [
           {
             type: 'text',
@@ -1361,6 +1408,23 @@ class ElementorWordPressMCP {
           },
         ],
       };
+    } catch (error: any) {
+      console.error(`Error updating post ${args.id}: ${error.response?.status} - ${error.response?.statusText}`);
+      console.error(`URL: ${error.config?.url}`);
+      console.error(`Headers: ${JSON.stringify(error.config?.headers)}`);
+      
+      if (error.response?.status === 404) {
+        throw new McpError(
+          ErrorCode.InvalidRequest,
+          `Post with ID ${args.id} not found. The post may have been deleted, be in trash, or may not exist.`
+        );
+      }
+      
+      throw new McpError(
+        ErrorCode.InvalidRequest,
+        `Failed to update post ${args.id}: ${error.response?.status} ${error.response?.statusText} - ${error.response?.data?.message || error.message}`
+      );
+    }
   }
 
   private async getPages(args: { per_page?: number; status?: string }) {
@@ -1578,12 +1642,14 @@ class ElementorWordPressMCP {
       ...(args.parent && { parent: args.parent }),
     };
 
-    const response = await this.axiosInstance!.post('pages', pageData);
-    
-    // Clear Elementor cache after creating page
-    await this.clearElementorCache(response.data.id);
-    
-          return {
+    try {
+      console.error(`Creating page with title: "${args.title}"`);
+      const response = await this.axiosInstance!.post('pages', pageData);
+      
+      // Clear Elementor cache after creating page
+      await this.clearElementorCache(response.data.id);
+      
+      return {
         content: [
           {
             type: 'text',
@@ -1594,6 +1660,16 @@ class ElementorWordPressMCP {
           },
         ],
       };
+    } catch (error: any) {
+      console.error(`Error creating page: ${error.response?.status} - ${error.response?.statusText}`);
+      console.error(`URL: ${error.config?.url}`);
+      console.error(`Headers: ${JSON.stringify(error.config?.headers)}`);
+      
+      throw new McpError(
+        ErrorCode.InvalidRequest,
+        `Failed to create page: ${error.response?.status} ${error.response?.statusText} - ${error.response?.data?.message || error.message}`
+      );
+    }
   }
 
   private async updatePage(args: {
@@ -1613,12 +1689,14 @@ class ElementorWordPressMCP {
     if (args.excerpt) updateData.excerpt = args.excerpt;
     if (args.parent !== undefined) updateData.parent = args.parent;
 
-    const response = await this.axiosInstance!.post(`pages/${args.id}`, updateData);
-    
-    // Clear Elementor cache after updating page
-    await this.clearElementorCache(args.id);
-    
-          return {
+    try {
+      console.error(`Updating page ID: ${args.id}`);
+      const response = await this.axiosInstance!.post(`pages/${args.id}`, updateData);
+      
+      // Clear Elementor cache after updating page
+      await this.clearElementorCache(args.id);
+      
+      return {
         content: [
           {
             type: 'text',
@@ -1629,6 +1707,23 @@ class ElementorWordPressMCP {
           },
         ],
       };
+    } catch (error: any) {
+      console.error(`Error updating page ${args.id}: ${error.response?.status} - ${error.response?.statusText}`);
+      console.error(`URL: ${error.config?.url}`);
+      console.error(`Headers: ${JSON.stringify(error.config?.headers)}`);
+      
+      if (error.response?.status === 404) {
+        throw new McpError(
+          ErrorCode.InvalidRequest,
+          `Page with ID ${args.id} not found. The page may have been deleted, be in trash, or may not exist.`
+        );
+      }
+      
+      throw new McpError(
+        ErrorCode.InvalidRequest,
+        `Failed to update page ${args.id}: ${error.response?.status} ${error.response?.statusText} - ${error.response?.data?.message || error.message}`
+      );
+    }
   }
 
   private async getElementorTemplates(args: { per_page?: number; type?: string }) {
@@ -2697,16 +2792,28 @@ Backup Details:
       params.media_type = args.media_type;
     }
 
-    const response = await this.axiosInstance!.get('media', { params });
-    
-    return {
-      content: [
-        {
-          type: 'text',
-          text: JSON.stringify(response.data, null, 2),
-        },
-      ],
-    };
+    try {
+      console.error(`Fetching media with params: ${JSON.stringify(params)}`);
+      const response = await this.axiosInstance!.get('media', { params });
+      
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify(response.data, null, 2),
+          },
+        ],
+      };
+    } catch (error: any) {
+      console.error(`Error fetching media: ${error.response?.status} - ${error.response?.statusText}`);
+      console.error(`URL: ${error.config?.url}`);
+      console.error(`Headers: ${JSON.stringify(error.config?.headers)}`);
+      
+      throw new McpError(
+        ErrorCode.InvalidRequest,
+        `Failed to fetch media: ${error.response?.status} ${error.response?.statusText} - ${error.response?.data?.message || error.message}`
+      );
+    }
   }
 
   private async uploadMedia(args: { file_path: string; title?: string; alt_text?: string }) {
