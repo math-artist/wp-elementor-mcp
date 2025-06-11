@@ -2,6 +2,32 @@
 
 All notable changes to the WordPress Elementor MCP Server will be documented in this file.
 
+## [1.6.5] - 2024-12-19
+
+### 📋 Structured JSON Responses
+- **Consistent Response Format**: All tools now return standardized `{status: "success"/"error", data: {...}}` JSON format
+- **Enhanced Error Objects**: Rich error responses with `error_type`, `code`, and detailed `message` fields
+- **Better Client Integration**: Standardized parsing for all MCP clients (Claude Desktop, Continue.dev, Cursor)
+- **Comprehensive Validation**: 100% response format compliance across all 34 tools
+
+### 🔧 Response Format Features
+- **Success Format**: `{status: "success", data: {actual_response_data}, message: "Operation completed"}`
+- **Error Format**: `{status: "error", data: {message, code, error_type, details}}`
+- **Debugging Support**: Enhanced error context and actionable feedback
+- **Client Compatibility**: Works seamlessly with structured response parsing
+
+### ✨ User Experience Improvements
+- **Clear Status Indicators**: Immediate success/error recognition in all responses
+- **Actionable Error Messages**: Detailed guidance for resolving issues
+- **Rich Data Context**: Comprehensive information in both success and error cases
+- **Consistent Parsing**: Eliminates client-side response format guesswork
+
+### 🛠️ Developer Benefits
+- **Type Safety**: Predictable response structures for better integration
+- **Error Handling**: Standardized error codes and categories across all operations
+- **Debugging**: Enhanced logging and error context for troubleshooting
+- **Documentation**: Updated guides reflect new response format standards
+
 ## [1.6.4] - 2024-12-19
 
 ### 🔧 MCP Client Fixes
