@@ -12,6 +12,7 @@ import {
 } from '@modelcontextprotocol/sdk/types.js';
 import axios, { AxiosInstance } from 'axios';
 import FormData from 'form-data';
+import https from 'https';
 import { Base64 } from 'js-base64';
 import { getServerConfig, ServerConfig } from './server-config.js';
 
@@ -33,7 +34,7 @@ class ElementorWordPressMCP {
     this.server = new Server(
       {
         name: 'elementor-wordpress-mcp',
-        version: '1.0.0',
+        version: '1.6.2',
       }
     );
 
@@ -73,12 +74,18 @@ class ElementorWordPressMCP {
     console.error(`Setting up WordPress connection to: ${baseURL}`);
     console.error(`Username: ${config.username}`);
     
+    // Create HTTPS agent for handling SSL certificates
+    const httpsAgent = new https.Agent({
+      rejectUnauthorized: this.shouldRejectUnauthorized(config.baseUrl)
+    });
+    
     this.axiosInstance = axios.create({
       baseURL,
       headers: {
         'Authorization': `Basic ${auth}`,
         'Content-Type': 'application/json',
       },
+      httpsAgent: httpsAgent,
       timeout: 30000, // 30 second timeout
     });
     
@@ -108,6 +115,32 @@ class ElementorWordPressMCP {
     );
     
     this.config = config;
+  }
+
+  private shouldRejectUnauthorized(baseUrl: string): boolean {
+    try {
+      const url = new URL(baseUrl);
+      
+      // Allow self-signed certificates for local development
+      const isLocal = url.hostname === 'localhost' || 
+                     url.hostname === '127.0.0.1' ||
+                     url.hostname.endsWith('.local') ||
+                     url.hostname.endsWith('.dev') ||
+                     url.hostname.endsWith('.test');
+      
+      if (isLocal) {
+        console.error(`🔓 Allowing self-signed certificates for local development site: ${url.hostname}`);
+        return false;
+      }
+      
+      // For production sites, require valid certificates
+      console.error(`🔒 Requiring valid SSL certificates for production site: ${url.hostname}`);
+      return true;
+    } catch (error) {
+      // If URL parsing fails, default to requiring valid certificates
+      console.error(`⚠️ Could not parse URL ${baseUrl}, defaulting to requiring valid SSL certificates`);
+      return true;
+    }
   }
 
   private ensureAuthenticated() {

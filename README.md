@@ -1,15 +1,15 @@
-# Elementor WordPress MCP Server v1.6.1
+# Elementor WordPress MCP Server v1.6.2
 
 A powerful, modular Model Context Protocol (MCP) server for WordPress and Elementor. This server provides AI assistants with scalable capabilities—from basic content management to advanced page building—through an intelligent configuration system.
 
-## 🆕 What's New in v1.6.1
+## 🆕 What's New in v1.6.2
 
-- **Enhanced Error Handling**: Much more informative 404 and connection error messages with debugging information
-- **New Content Discovery Tool**: `list_all_content` - Find all posts/pages with Elementor status indicators (✅/⚠️/❌)
-- **Improved Debugging**: Console logging, connection diagnostics, and detailed request information
-- **Better WordPress Integration**: Enhanced data retrieval with `context: 'edit'` for full meta access
-- **Connection Troubleshooting**: Automatic timeout handling and enhanced error reporting
-- **Comprehensive Test Suite**: Added credential testing with real WordPress connections
+- **🔐 SSL Certificate Support**: Automatic SSL handling for local development sites (`.local`, `.dev`, `.test`, `localhost`)
+- **🚀 Zero Configuration**: Works out-of-the-box with popular local development tools
+- **🛡️ Security Maintained**: Production sites still require valid SSL certificates  
+- **📚 Complete Documentation**: New `SSL-SUPPORT.md` guide with troubleshooting tips
+- **✨ Enhanced Error Logging**: SSL status indicators and improved debugging messages
+- **🧪 Tested & Verified**: Confirmed working with local WordPress development environments
 
 ## ✨ Key Features
 
@@ -321,6 +321,16 @@ npm run test:all               # Complete test suite
 ## 🔍 Troubleshooting
 
 ⚠️ **Having issues with 404 errors or "No Elementor data found"?** See our comprehensive [TROUBLESHOOTING.md](TROUBLESHOOTING.md) guide for detailed debugging steps and solutions.
+
+### 🔐 SSL Certificate Support 
+
+The MCP server includes **automatic SSL certificate handling** for seamless local development:
+
+- **Local Development**: Automatically allows self-signed certificates for `.local`, `.dev`, `.test`, `localhost`
+- **Production Sites**: Requires valid SSL certificates for security
+- **Zero Configuration**: Works out-of-the-box with popular local development tools
+
+See [SSL-SUPPORT.md](SSL-SUPPORT.md) for complete details.
 
 ### Quick Diagnostic Tools
 ```javascript
