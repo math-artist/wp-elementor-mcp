@@ -2,9 +2,9 @@
   "mcpServers": {
     "elementor-wordpress": {
       "command": "node",
-      "args": ["/absolute/path/to/your/elementor-wordpress-mcp/dist/index.js"],
+      "args": ["/Users/jasonmiller/Desktop/Projects/Working Files/Cursor/Elementor MCP/dist/index.js"],
       "env": {
-        "WORDPRESS_BASE_URL": "https://yoursite.com",
+        "WORDPRESS_BASE_URL": "https://joincollectiveos.local",
         "WORDPRESS_USERNAME": "your-wp-username",
         "WORDPRESS_APPLICATION_PASSWORD": "xxxx xxxx xxxx xxxx xxxx xxxx"
       }

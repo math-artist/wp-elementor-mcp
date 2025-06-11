@@ -65,3 +65,5 @@ coverage/
 # Temporary folders
 tmp/
 temp/ 
+# Cursor MCP configuration (contains API keys)
+.cursor/

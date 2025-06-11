@@ -2,6 +2,19 @@
 
 All notable changes to the WordPress Elementor MCP Server will be documented in this file.
 
+## [1.6.3] - 2025-06-10
+
+### 🧹 Maintenance
+- **Project Cleanup**: Removed test and debug files created during development
+- **Security**: Ensured `.cursor/` folder is properly excluded from git to protect API keys
+- **Documentation**: Enhanced pull request documentation and release processes
+- **Development**: Improved debugging workflow and local testing procedures
+
+### 🔧 Improved
+- **Development Experience**: Streamlined local testing and debugging setup
+- **Security**: Better protection of sensitive configuration files
+- **Documentation**: Enhanced contribution guidelines and release documentation
+
 ## [1.6.2] - 2024-12-10
 
 ### ✨ Added
