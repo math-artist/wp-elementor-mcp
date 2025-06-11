@@ -1,5 +1,17 @@
 #!/usr/bin/env node
 
+// Load environment variables from .env file
+import { config } from 'dotenv';
+import { dirname, join } from 'path';
+import { fileURLToPath } from 'url';
+
+// Get the directory of this script for .env file path
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const envPath = join(__dirname, '.env');
+
+config({ path: envPath });
+
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { spawn } from 'child_process';
@@ -210,10 +222,28 @@ function getTestArgumentsForTool(toolName) {
   
   // Return appropriate test arguments based on tool name
   switch (toolName) {
+    // WordPress Core Operations
+    case 'configure_wordpress':
+      return { 
+        baseUrl: 'https://test.local', 
+        username: 'testuser', 
+        applicationPassword: 'test123' 
+      };
+      
+    case 'get_posts':
     case 'get_pages':
     case 'get_media':
     case 'list_all_content':
       return { per_page: 5 };
+      
+    case 'get_post':
+      return { id: post_id };
+      
+    case 'create_post':
+      return { title: page_title, content: '<p>Test content</p>' };
+      
+    case 'update_post':
+      return { id: post_id, title: `Updated ${page_title}` };
       
     case 'create_page':
       return { title: page_title, content: '<p>Test content</p>' };
@@ -221,11 +251,24 @@ function getTestArgumentsForTool(toolName) {
     case 'update_page':
       return { id: post_id, title: `Updated ${page_title}` };
       
+    case 'upload_media':
+      return { file_path: '/tmp/test.jpg', title: 'Test Image' };
+      
+    // Elementor Core Operations  
+    case 'get_elementor_data':
+    case 'backup_elementor_data':
+      return { post_id };
+      
+    case 'update_elementor_data':
+      return { post_id, elementor_data: '[]' };
+      
     case 'get_elementor_elements':
     case 'get_elementor_data_chunked':
       return { post_id };
       
     case 'get_elementor_widget':
+      return { post_id, widget_id };
+      
     case 'update_elementor_widget':
       return { post_id, widget_id, widget_settings };
       
@@ -236,23 +279,57 @@ function getTestArgumentsForTool(toolName) {
         widgets_updates: [{ widget_id, widget_settings }] 
       };
       
-    case 'upload_media':
-      return { file_path: '/tmp/test.jpg', title: 'Test Image' };
+    // Section & Widget Management
+    case 'create_elementor_section':
+      return { post_id };
       
-    case 'create_section':
-      return { post_id, position: 0 };
+    case 'create_elementor_container':
+      return { post_id };
+      
+    case 'add_column_to_section':
+      return { post_id, section_id };
+      
+    case 'duplicate_section':
+      return { post_id, section_id };
       
     case 'add_widget_to_section':
-      return { post_id, section_id, widget_type: 'text', position: 0 };
+      return { post_id, widget_type: 'text' };
+      
+    case 'insert_widget_at_position':
+      return { post_id, widget_type: 'text', target_element_id: 'element123' };
+      
+    case 'clone_widget':
+      return { post_id, widget_id };
+      
+    case 'move_widget':
+      return { post_id, widget_id };
+      
+    case 'delete_elementor_element':
+      return { post_id, element_id: 'element123' };
+      
+    case 'reorder_elements':
+      return { post_id, container_id: 'container123', element_ids: ['elem1', 'elem2'] };
+      
+    case 'copy_element_settings':
+      return { post_id, source_element_id: 'source123', target_element_id: 'target123' };
+      
+    case 'get_page_structure':
+      return { post_id };
+      
+    // Performance & Advanced Operations
+    case 'clear_elementor_cache':
+    case 'clear_elementor_cache_by_page':
+      return { post_id };
+      
+    case 'find_elements_by_type':
+      return { post_id, widget_type: 'text' };
+      
+    // Template Management  
+    case 'get_elementor_templates':
+      return { per_page: 5 };
       
     case 'create_template':
       return { name: template_name, type: 'page' };
-      
-    case 'find_elements_by_type':
-      return { post_id, element_type: 'text' };
-      
-    case 'backup_elementor_data':
-      return { post_id };
       
     default:
       return {}; // Empty args for tools that don't need them
@@ -327,10 +404,24 @@ function validateToolArguments(tool, args) {
 function requiresWordPressConnection(toolName) {
   // List of tools that require actual WordPress connection
   const wpConnectionTools = [
+    // WordPress Core Operations
+    'get_posts', 'get_post', 'create_post', 'update_post',
     'get_pages', 'create_page', 'update_page',
-    'get_media', 'upload_media',
+    'get_media', 'upload_media', 'list_all_content',
+    
+    // Elementor Operations  
+    'get_elementor_templates', 'get_elementor_data', 'update_elementor_data',
     'get_elementor_elements', 'get_elementor_widget', 'update_elementor_widget',
-    'update_elementor_section', 'get_elementor_data_chunked', 'list_all_content'
+    'update_elementor_section', 'get_elementor_data_chunked', 'backup_elementor_data',
+    
+    // Section & Widget Management
+    'create_elementor_section', 'create_elementor_container', 'add_column_to_section',
+    'duplicate_section', 'add_widget_to_section', 'insert_widget_at_position',
+    'clone_widget', 'move_widget', 'delete_elementor_element', 'reorder_elements',
+    'copy_element_settings', 'get_page_structure',
+    
+    // Performance & Advanced Operations
+    'clear_elementor_cache', 'clear_elementor_cache_by_page', 'find_elements_by_type'
   ];
   
   return wpConnectionTools.includes(toolName);

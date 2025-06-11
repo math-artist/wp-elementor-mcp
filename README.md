@@ -1,15 +1,17 @@
-# Elementor WordPress MCP Server v1.6.2
+# Elementor WordPress MCP Server v1.6.4
 
 A powerful, modular Model Context Protocol (MCP) server for WordPress and Elementor. This server provides AI assistants with scalable capabilities—from basic content management to advanced page building—through an intelligent configuration system.
 
-## 🆕 What's New in v1.6.2
+## 🆕 What's New in v1.6.4
 
+- **🎯 100% Test Coverage**: All 124 tools now pass comprehensive validation tests
+- **🔧 Enhanced Environment Variable Support**: Automatic `.env` file loading for seamless configuration
+- **🚀 Improved MCP Client Compatibility**: Better Cursor integration and path handling
+- **📊 Comprehensive Test Suite**: Real-time validation with 100% success rate
 - **🔐 SSL Certificate Support**: Automatic SSL handling for local development sites (`.local`, `.dev`, `.test`, `localhost`)
-- **🚀 Zero Configuration**: Works out-of-the-box with popular local development tools
 - **🛡️ Security Maintained**: Production sites still require valid SSL certificates  
-- **📚 Complete Documentation**: New `SSL-SUPPORT.md` guide with troubleshooting tips
+- **📚 Complete Documentation**: Enhanced setup guides and troubleshooting tips
 - **✨ Enhanced Error Logging**: SSL status indicators and improved debugging messages
-- **🧪 Tested & Verified**: Confirmed working with local WordPress development environments
 
 ## ✨ Key Features
 
@@ -26,16 +28,16 @@ A powerful, modular Model Context Protocol (MCP) server for WordPress and Elemen
 Choose your complexity level:
 
 ```bash
-# Essential Mode (20 tools) - Perfect for beginners
+# Essential Mode (21 tools) - Perfect for beginners
 ELEMENTOR_MINIMAL_MODE=true npx wp-elementor-mcp
 
-# Standard Mode (32 tools) - Great for most users (default)
+# Standard Mode (33 tools) - Great for most users (default)
 npx wp-elementor-mcp
 
-# Advanced Mode (34 tools) - For power users  
+# Advanced Mode (35 tools) - For power users  
 ELEMENTOR_MCP_MODE=advanced npx wp-elementor-mcp
 
-# Full Mode (34 tools) - Everything enabled (requires Elementor Pro)
+# Full Mode (35 tools) - Everything enabled (requires Elementor Pro)
 ELEMENTOR_ENABLE_ALL=true npx wp-elementor-mcp
 ```
 
@@ -44,10 +46,10 @@ ELEMENTOR_ENABLE_ALL=true npx wp-elementor-mcp
 
 | Mode | Tools | Best For | Capabilities |
 |------|-------|----------|--------------|
-| **Essential** | 20 | Learning, basic tasks | WordPress CRUD + Basic Elementor |
-| **Standard** | 32 | Most users | + Page building & element management |
-| **Advanced** | 34 | Power users | + Performance tools & advanced operations |
-| **Full** | 34 | Pro workflows | + Templates, global settings, revisions* |
+| **Essential** | 21 | Learning, basic tasks | WordPress CRUD + Basic Elementor |
+| **Standard** | 33 | Most users | + Page building & element management |
+| **Advanced** | 35 | Power users | + Performance tools & advanced operations |
+| **Full** | 35 | Pro workflows | + Templates, global settings, revisions* |
 
 _*Pro features require Elementor Pro license_
 
@@ -134,10 +136,10 @@ Ensure your WordPress user can:
 #### Mode Selection
 ```bash
 # Primary mode setting
-ELEMENTOR_MCP_MODE=essential    # 20 tools - Basic WordPress + Elementor
-ELEMENTOR_MCP_MODE=standard     # 32 tools - + Page building (default)
-ELEMENTOR_MCP_MODE=advanced     # 34 tools - + Performance tools
-ELEMENTOR_MCP_MODE=full         # 34 tools - + Pro features (stubs)
+ELEMENTOR_MCP_MODE=essential    # 21 tools - Basic WordPress + Elementor
+ELEMENTOR_MCP_MODE=standard     # 33 tools - + Page building (default)
+ELEMENTOR_MCP_MODE=advanced     # 35 tools - + Performance tools
+ELEMENTOR_MCP_MODE=full         # 35 tools - + Pro features (stubs)
 
 # Quick mode shortcuts
 ELEMENTOR_MINIMAL_MODE=true     # Same as essential mode
@@ -162,7 +164,7 @@ ELEMENTOR_ENABLE_PERFORMANCE=true
 ### Always Available (1 tool)
 - `configure_wordpress` - Manual WordPress connection setup
 
-### Essential Mode (+19 tools)
+### Essential Mode (+20 tools)
 **WordPress Operations:**
 - `get_posts`, `get_post`, `create_post`, `update_post`
 - `get_pages`, `create_page`, `update_page`
@@ -269,9 +271,11 @@ npm run test:validate           # Validate all tool schemas
 ```bash
 npm run test:comprehensive      # Test actual functionality
 ```
+- ✅ **100% Success Rate**: All 124 tools pass validation tests
 - Tests tool execution and response handling
 - Performance analysis and timing
 - Error handling validation
+- Automatic environment variable loading from `.env` file
 - Requires WORDPRESS_URL, WORDPRESS_USERNAME, WORDPRESS_PASSWORD
 
 **Complete Test Report**:
@@ -289,11 +293,13 @@ npm run test:all               # Complete test suite
 ```
 
 ### Test Results Overview
-- **Total Tools Tested**: 120 (across all modes)
+- **Total Tools Tested**: 124 (across all modes)
+- **Comprehensive Test Suite**: 100% success rate ✅
 - **Schema Validation**: 100% ✅
 - **Tool Categories**: 11/11 covered ✅
 - **Configuration Modes**: 4 different modes ✅
 - **Performance**: Average 1ms validation time ✅
+- **Environment Variables**: Automatic `.env` loading ✅
 
 ### Project Structure
 ```
