@@ -1,9 +1,10 @@
-# Elementor WordPress MCP Server v1.6.7
+# Elementor WordPress MCP Server v1.6.8
 
 A powerful, modular Model Context Protocol (MCP) server for WordPress and Elementor. This server provides AI assistants with scalable capabilities—from basic content management to advanced page building—through an intelligent configuration system.
 
-## 🆕 What's New in v1.6.7
+## 🆕 What's New in v1.6.8
 
+- **📚 Documentation Update**: Updated README to reflect all v1.6.7 improvements and fixes
 - **🚨 Critical Tool Fixes**: Resolved missing `clear_elementor_cache` tool implementation (Issues #14, #15)
 - **📋 100% Structured Response Format**: Complete elimination of legacy response formats across all 34+ tools
 - **🔧 Enhanced Error Handling**: All MCP errors now return structured JSON instead of plain text (Issue #16)

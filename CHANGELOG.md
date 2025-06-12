@@ -2,6 +2,19 @@
 
 All notable changes to the WordPress Elementor MCP Server will be documented in this file.
 
+## [1.6.8] - 2025-01-23
+
+### Changed
+- **📚 Documentation Update**: Updated README.md to reflect all v1.6.7 improvements and fixes
+- **📝 Version Alignment**: Ensured npm package documentation matches current functionality
+- **🎯 Feature Clarity**: Enhanced feature descriptions and installation instructions
+- **📊 Current Status**: Updated "What's New" section with comprehensive v1.6.7 changes
+
+### Technical Notes
+- This is a documentation-only release to update the npm package README
+- v1.6.7 was published with outdated documentation (v1.6.5 README)
+- All functional improvements from v1.6.7 remain unchanged
+
 ## [1.6.7] - 2025-01-23
 
 ### Fixed
