@@ -1378,7 +1378,7 @@ class ElementorWordPressMCP {
         },
         serverInfo: {
           name: 'elementor-wordpress-mcp',
-          version: '1.6.8',
+          version: '1.6.7',
         },
       };
     });

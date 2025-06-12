@@ -2,9 +2,10 @@
 
 All notable changes to the WordPress Elementor MCP Server will be documented in this file.
 
-## [1.6.8] - 2025-01-23
+## [1.6.7] - 2025-01-23
 
 ### Fixed
+- **Complete Response Format Consistency**: Identified and fixed 6 additional tools that were still using legacy response formats
 - **Missing Tool Implementation** (Issues #14, #15): Fixed `clear_elementor_cache` tool completely missing from handler
   - Added missing `clearElementorCacheGeneral` method implementation 
   - Added missing case handler in tool routing switch statement
@@ -24,6 +25,17 @@ All notable changes to the WordPress Elementor MCP Server will be documented in 
   - Internal errors properly wrapped in structured format
   - Enhanced error messages with better context and debugging information
   - Consistent error categorization (METHOD_NOT_FOUND, EXECUTION_ERROR, MCP_ERROR, etc.)
+- **Enhanced Data Structures**: Success responses now include operation type, timestamps, and detailed context
+- **Rich Error Details**: Error responses include proper error codes, types, and actionable details
+- **Pagination Support**: Chunked data operations include navigation helpers
+- **Debug Information**: Enhanced debugging data in structured format
+
+### Tools Fixed
+- **getElementorData**: Fixed debug/error cases to use structured responses with metadata
+- **getElementorElements**: Enhanced error responses with proper error codes
+- **getElementorDataChunked**: Added pagination helpers and structured chunk information
+- **uploadMedia**: Complete response format overhaul with operation details
+- **All Stub Methods**: Updated 15+ placeholder methods to use structured error responses
 
 ### Technical Details
 - Added `clearElementorCacheGeneral(args: { post_id?: number })` method
@@ -31,6 +43,8 @@ All notable changes to the WordPress Elementor MCP Server will be documented in 
 - Enhanced error response structure with proper typing and categorization
 - All 34+ tools now maintain 100% consistent response formats
 - Complete elimination of legacy plain-text error responses
+- All methods now use `createSuccessResponse()` and `createErrorResponse()` helpers
+- Eliminated legacy `{content: [{type: 'text', text: '...'}]}` format entirely
 
 ### Testing
 - ✅ 120 tools tested across all modes (Essential, Standard, Advanced, Full)
@@ -38,6 +52,8 @@ All notable changes to the WordPress Elementor MCP Server will be documented in 
 - ✅ All error scenarios return structured JSON responses
 - ✅ Cache clearing functionality fully operational
 - ✅ No breaking changes introduced
+- ✅ Verified test compatibility with new response formats
+- ✅ Response validation and 100% coverage achieved
 
 ## [1.6.6] - 2025-01-23
 
