@@ -21,6 +21,7 @@ import {
   ListToolsRequestSchema,
   McpError,
   ReadResourceRequestSchema,
+  InitializeRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
 import axios, { AxiosInstance } from 'axios';
 import FormData from 'form-data';
@@ -1319,6 +1320,8 @@ class ElementorWordPressMCP {
             return await this.regenerateCSS(args as any);
           case 'optimize_elementor_assets':
             return await this.optimizeElementorAssets(args as any);
+          case 'clear_elementor_cache':
+            return await this.clearElementorCacheGeneral(args as any);
           case 'clear_elementor_cache_by_page':
             return await this.clearElementorCacheByPage(args as any);
           // Advanced Element Operations
@@ -1341,14 +1344,43 @@ class ElementorWordPressMCP {
           case 'compare_elementor_revisions':
             return await this.compareElementorRevisions(args as any);
           default:
-            throw new McpError(ErrorCode.MethodNotFound, `Unknown tool: ${name}`);
+            return this.createErrorResponse(
+              `Unknown tool: ${name}`,
+              'METHOD_NOT_FOUND',
+              'TOOL_ERROR',
+              `Tool "${name}" is not implemented or available`
+            );
         }
       } catch (error) {
         if (error instanceof McpError) {
-          throw error;
+          // Convert MCP errors to structured format
+          return this.createErrorResponse(
+            error.message || 'MCP operation failed',
+            'MCP_ERROR',
+            'PROTOCOL_ERROR',
+            `MCP Error Code: ${error.code || 'Unknown'}`
+          );
         }
-        throw new McpError(ErrorCode.InternalError, `Tool execution failed: ${error}`);
+        return this.createErrorResponse(
+          `Tool execution failed: ${error instanceof Error ? error.message : String(error)}`,
+          'EXECUTION_ERROR',
+          'INTERNAL_ERROR',
+          'Unexpected error during tool execution'
+        );
       }
+    });
+
+    this.server.setRequestHandler(InitializeRequestSchema, async (request) => {
+      return {
+        protocolVersion: request.params.protocolVersion,
+        capabilities: {
+          tools: {},
+        },
+        serverInfo: {
+          name: 'elementor-wordpress-mcp',
+          version: '1.6.8',
+        },
+      };
     });
   }
 
@@ -4538,6 +4570,33 @@ Suggestions:
         "CLEAR_CACHE_ERROR",
         "API_ERROR",
         "Operation failed"
+      );
+    }
+  }
+
+  private async clearElementorCacheGeneral(args: { post_id?: number }) {
+    this.ensureAuthenticated();
+    
+    try {
+      await this.clearElementorCache(args.post_id);
+      
+      return this.createSuccessResponse(
+        {
+          operation: "cache_clear",
+          scope: args.post_id ? "specific_post" : "general",
+          post_id: args.post_id || null,
+          cache_cleared: true
+        },
+        args.post_id 
+          ? `Cache cleared successfully for post/page ID: ${args.post_id}`
+          : "General Elementor cache cleared successfully"
+      );
+    } catch (error: any) {
+      return this.createErrorResponse(
+        `Failed to clear cache: ${error.message}`,
+        "CLEAR_CACHE_ERROR",
+        "API_ERROR",
+        `Cache clearing operation failed${args.post_id ? ` for post/page ${args.post_id}` : ''}`
       );
     }
   }
