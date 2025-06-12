@@ -21,6 +21,7 @@ import {
   ListToolsRequestSchema,
   McpError,
   ReadResourceRequestSchema,
+  InitializeRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
 import axios, { AxiosInstance } from 'axios';
 import FormData from 'form-data';
@@ -55,7 +56,7 @@ class ElementorWordPressMCP {
     this.server = new Server(
       {
         name: 'elementor-wordpress-mcp',
-        version: '1.6.5',
+        version: '1.6.7',
       }
     );
 
@@ -1319,6 +1320,8 @@ class ElementorWordPressMCP {
             return await this.regenerateCSS(args as any);
           case 'optimize_elementor_assets':
             return await this.optimizeElementorAssets(args as any);
+          case 'clear_elementor_cache':
+            return await this.clearElementorCacheGeneral(args as any);
           case 'clear_elementor_cache_by_page':
             return await this.clearElementorCacheByPage(args as any);
           // Advanced Element Operations
@@ -1341,14 +1344,43 @@ class ElementorWordPressMCP {
           case 'compare_elementor_revisions':
             return await this.compareElementorRevisions(args as any);
           default:
-            throw new McpError(ErrorCode.MethodNotFound, `Unknown tool: ${name}`);
+            return this.createErrorResponse(
+              `Unknown tool: ${name}`,
+              'METHOD_NOT_FOUND',
+              'TOOL_ERROR',
+              `Tool "${name}" is not implemented or available`
+            );
         }
       } catch (error) {
         if (error instanceof McpError) {
-          throw error;
+          // Convert MCP errors to structured format
+          return this.createErrorResponse(
+            error.message || 'MCP operation failed',
+            'MCP_ERROR',
+            'PROTOCOL_ERROR',
+            `MCP Error Code: ${error.code || 'Unknown'}`
+          );
         }
-        throw new McpError(ErrorCode.InternalError, `Tool execution failed: ${error}`);
+        return this.createErrorResponse(
+          `Tool execution failed: ${error instanceof Error ? error.message : String(error)}`,
+          'EXECUTION_ERROR',
+          'INTERNAL_ERROR',
+          'Unexpected error during tool execution'
+        );
       }
+    });
+
+    this.server.setRequestHandler(InitializeRequestSchema, async (request) => {
+      return {
+        protocolVersion: request.params.protocolVersion,
+        capabilities: {
+          tools: {},
+        },
+        serverInfo: {
+          name: 'elementor-wordpress-mcp',
+          version: '1.6.7',
+        },
+      };
     });
   }
 
@@ -2030,24 +2062,31 @@ Suggestions:
           const parsedData = JSON.parse(elementorData);
           debugInfo += `Elementor Elements Count: ${Array.isArray(parsedData) ? parsedData.length : 'Not an array'}\n`;
           
-          return {
-            content: [
-              {
-                type: 'text',
-                text: `${debugInfo}\n--- Elementor Data ---\n${JSON.stringify(parsedData, null, 2)}`,
-              },
-            ],
-          };
+          return this.createSuccessResponse(
+            {
+              post_id: args.post_id,
+              post_type: postType,
+              title: data.title?.rendered || data.title?.raw || 'Unknown',
+              status: data.status,
+              edit_mode: elementorEditMode,
+              elementor_data: parsedData,
+              metadata: {
+                has_page_settings: !!data.meta?._elementor_page_settings,
+                has_elementor_data: true,
+                elements_count: Array.isArray(parsedData) ? parsedData.length : 0,
+                version: elementorVersion
+              }
+            },
+            `Successfully retrieved Elementor data for ${postType} ID ${args.post_id} with ${Array.isArray(parsedData) ? parsedData.length : 0} elements`
+          );
         } catch (parseError) {
           debugInfo += `⚠️ Elementor data found but failed to parse JSON\n`;
-          return {
-            content: [
-              {
-                type: 'text',
-                text: `${debugInfo}\n--- Raw Elementor Data ---\n${elementorData}`,
-              },
-            ],
-          };
+          return this.createErrorResponse(
+            `Failed to parse Elementor data for ${postType} ID ${args.post_id}: JSON parsing error`,
+            'PARSE_ERROR',
+            'DATA_FORMAT_ERROR',
+            `${debugInfo}\nRaw data: ${elementorData?.substring(0, 200)}...`
+          );
         }
       } else {
         // Check if this is an Elementor page without data
@@ -2061,14 +2100,12 @@ Suggestions:
           debugInfo += `\n❌ This ${postType} does not use Elementor builder.\n`;
         }
         
-        return {
-          content: [
-            {
-              type: 'text',
-              text: `${debugInfo}\n--- Available Meta Keys ---\n${data.meta ? JSON.stringify(Object.keys(data.meta), null, 2) : 'No meta data available'}`,
-            },
-          ],
-        };
+        return this.createErrorResponse(
+          `No Elementor data found for ${postType} ID ${args.post_id}`,
+          'NO_ELEMENTOR_DATA',
+          'DATA_NOT_FOUND',
+          `${debugInfo}\nAvailable meta keys: ${data.meta ? Object.keys(data.meta).join(', ') : 'None'}`
+        );
       }
     }, 'getElementorData', `post/page ID ${args.post_id}`);
   }
@@ -2522,20 +2559,12 @@ Suggestions:
       const parsedResult = await this.safeGetElementorData(args.post_id);
       
       if (!parsedResult.success || !parsedResult.data) {
-        return {
-          content: [
-            {
-              type: 'text',
-              text: JSON.stringify({ 
-                post_id: args.post_id,
-                error: 'No Elementor data found',
-                message: `Post/page ID ${args.post_id} does not contain Elementor data or is not built with Elementor: ${parsedResult.error}`,
-                total_elements: 0,
-                elements: [] 
-              }, null, 2),
-            },
-          ],
-        };
+        return this.createErrorResponse(
+          `No Elementor data found for post/page ID ${args.post_id}`,
+          'NO_ELEMENTOR_DATA',
+          'DATA_NOT_FOUND',
+          `Post/page does not contain Elementor data or is not built with Elementor: ${parsedResult.error}`
+        );
       }
       
       const elementorData = parsedResult.data;
@@ -2742,31 +2771,21 @@ Suggestions:
       // Clear Elementor cache after updating data
       await this.clearElementorCache(args.post_id);
       
-      return {
-        content: [
-          {
-            type: 'text',
-            text: `Elementor section ${args.section_id} updated successfully for ${postType} ID: ${args.post_id}.
-
-Updated widgets: ${updatedWidgets.join(', ') || 'None'}
-Widgets not found: ${args.widgets_updates.filter(w => !updatedWidgets.includes(w.widget_id)).map(w => w.widget_id).join(', ') || 'None'}
-
-⚠️  IMPORTANT: MANUAL CACHE CLEARING REQUIRED
-The Elementor cache has been programmatically cleared, but you may need to manually clear additional caches:
-
-🔧 REQUIRED STEPS:
-1. Go to WordPress Admin → Elementor → Tools → Regenerate CSS & Data
-2. Click "Regenerate Files & Data" 
-3. If using caching plugins, clear those caches too
-4. Clear browser cache or use incognito/private browsing
-
-🎯 VERIFICATION:
-Visit the page to confirm changes are visible. If not, the cache clearing was incomplete.
-
-✅ Section-level batch update completed.`,
-          },
-        ],
-      };
+      return this.createSuccessResponse(
+        {
+          operation_type: "update_section_widgets",
+          section_id: args.section_id,
+          post_id: args.post_id,
+          post_type: postType,
+          updated_widgets: updatedWidgets,
+          widgets_not_found: args.widgets_updates.filter(w => !updatedWidgets.includes(w.widget_id)).map(w => w.widget_id),
+          total_updates_requested: args.widgets_updates.length,
+          successful_updates: updatedWidgets.length,
+          cache_cleared: true,
+          manual_cache_clearing_required: true
+        },
+        `Elementor section ${args.section_id} updated successfully with ${updatedWidgets.length}/${args.widgets_updates.length} widget updates`
+      );
     } catch (error: any) {
       if (error instanceof McpError) {
         throw error;
@@ -2832,26 +2851,28 @@ Visit the page to confirm changes are visible. If not, the cache clearing was in
       
       const chunk = elementorData.slice(startIndex, endIndex);
       
-      return {
-        content: [
-          {
-            type: 'text',
-            text: JSON.stringify({
-              post_id: args.post_id,
-              chunk_info: {
-                chunk_index: chunkIndex,
-                chunk_size: chunkSize,
-                total_chunks: totalChunks,
-                total_elements: totalElements,
-                elements_in_chunk: chunk.length,
-                start_index: startIndex,
-                end_index: endIndex - 1
-              },
-              chunk_data: chunk
-            }, null, 2),
+      return this.createSuccessResponse(
+        {
+          post_id: args.post_id,
+          chunk_info: {
+            chunk_index: chunkIndex,
+            chunk_size: chunkSize,
+            total_chunks: totalChunks,
+            total_elements: totalElements,
+            elements_in_chunk: chunk.length,
+            start_index: startIndex,
+            end_index: endIndex - 1
           },
-        ],
-      };
+          chunk_data: chunk,
+          pagination: {
+            has_next_chunk: chunkIndex < totalChunks - 1,
+            has_previous_chunk: chunkIndex > 0,
+            next_chunk_index: chunkIndex < totalChunks - 1 ? chunkIndex + 1 : null,
+            previous_chunk_index: chunkIndex > 0 ? chunkIndex - 1 : null
+          }
+        },
+        `Retrieved chunk ${chunkIndex + 1} of ${totalChunks} (${chunk.length} elements) for post ID ${args.post_id}`
+      );
     } catch (error: any) {
       if (error instanceof McpError) {
         throw error;
@@ -2951,26 +2972,20 @@ Visit the page to confirm changes are visible. If not, the cache clearing was in
         response = await this.axiosInstance!.post(`posts/${args.post_id}`, backupMeta);
       }
       
-      return {
-        content: [
-          {
-            type: 'text',
-            text: `✅ Elementor data backup created successfully!
-
-Backup Details:
-- Post/Page ID: ${args.post_id}
-- Post Type: ${postType}
-- Post Title: ${postInfo.data.title.rendered || postInfo.data.title.raw}
-- Backup Name: ${backupName}
-- Backup Key: ${backupKey}
-- Timestamp: ${timestamp}
-
-💡 This backup is stored as meta data in the same post/page. You can restore it using the regular update_elementor_data tool with the backed up data if needed.
-
-⚠️  Note: This backup method stores data in WordPress meta. For production use, consider implementing a dedicated backup system with external storage.`,
-          },
-        ],
-      };
+      return this.createSuccessResponse(
+        {
+          operation_type: "backup_elementor_data",
+          post_id: args.post_id,
+          post_type: postType,
+          post_title: postInfo.data.title.rendered || postInfo.data.title.raw,
+          backup_name: backupName,
+          backup_key: backupKey,
+          timestamp: timestamp,
+          backup_storage: "wordpress_meta",
+          data_size: JSON.stringify(parsedResult.data).length
+        },
+        `Elementor data backup created successfully! Backup key: ${backupKey}`
+      );
     } catch (error: any) {
       if (error instanceof McpError) {
         throw error;
@@ -3035,23 +3050,12 @@ Backup Details:
       const path = await import('path');
       
       if (!fs.existsSync(args.file_path)) {
-        // Return status-based error response instead of throwing McpError
-        return {
-          content: [
-            {
-              type: 'text',
-              text: JSON.stringify({
-                status: "error",
-                data: {
-                  message: `Failed to upload media: File not found: ${args.file_path}`,
-                  code: "FILE_NOT_FOUND",
-                  error_type: "VALIDATION_ERROR",
-                  details: "The specified file path does not exist or is not accessible"
-                }
-              }, null, 2),
-            },
-          ],
-        };
+        return this.createErrorResponse(
+          `Failed to upload media: File not found: ${args.file_path}`,
+          'FILE_NOT_FOUND',
+          'VALIDATION_ERROR',
+          'The specified file path does not exist or is not accessible'
+        );
       }
 
       const formData = new FormData();
@@ -3074,48 +3078,28 @@ Backup Details:
         },
       });
       
-      // Return status-based success response
-      return {
-        content: [
-          {
-            type: 'text',
-            text: JSON.stringify({
-              status: "success",
-              data: {
-                message: `Media uploaded successfully!`,
-                media_id: response.data.id,
-                url: response.data.source_url,
-                title: response.data.title.rendered,
-                details: {
-                  id: response.data.id,
-                  source_url: response.data.source_url,
-                  title: response.data.title.rendered,
-                  mime_type: response.data.mime_type,
-                  file_size: response.data.media_details?.filesize
-                }
-              }
-            }, null, 2),
-          },
-        ],
-      };
+      return this.createSuccessResponse(
+        {
+          operation_type: "upload_media",
+          media_id: response.data.id,
+          url: response.data.source_url,
+          title: response.data.title.rendered,
+          file_path: args.file_path,
+          file_name: fileName,
+          mime_type: response.data.mime_type,
+          file_size: response.data.media_details?.filesize || null,
+          alt_text: args.alt_text || null,
+          upload_date: response.data.date
+        },
+        `Media uploaded successfully! Media ID: ${response.data.id} - ${response.data.title.rendered}`
+      );
     } catch (error: any) {
-      // Return status-based error response instead of throwing McpError
-      return {
-        content: [
-          {
-            type: 'text',
-            text: JSON.stringify({
-              status: "error",
-              data: {
-                message: `Failed to upload media: ${error.response?.data?.message || error.message}`,
-                code: "UPLOAD_FAILED",
-                error_type: "API_ERROR",
-                details: error.response?.data || error.message
-              }
-            }, null, 2),
-          },
-        ],
-      };
+      return this.createErrorResponse(
+        `Failed to upload media: ${error.response?.data?.message || error.message}`,
+        'UPLOAD_FAILED',
+        'API_ERROR',
+        `HTTP ${error.response?.status}: ${error.response?.statusText} - ${error.response?.data || error.message}`
+      );
     }
   }
 
@@ -3211,14 +3195,18 @@ Backup Details:
         elementor_data: JSON.stringify(elementorData)
       });
       
-      return {
-        content: [
-          {
-            type: 'text',
-            text: `Section created successfully! Section ID: ${sectionId}\nColumns: ${columns}\nPosition: ${args.position || 'end'}`,
-          },
-        ],
-      };
+      return this.createSuccessResponse(
+        {
+          operation_type: "create_section",
+          section_id: sectionId,
+          columns: columns,
+          position: args.position || elementorData.length - 1,
+          post_id: args.post_id,
+          section_settings: args.section_settings || {},
+          column_ids: columnElements.map(col => col.id)
+        },
+        `Section created successfully! Section ID: ${sectionId} with ${columns} columns at position ${args.position || 'end'}`
+      );
     } catch (error: any) {
       if (error instanceof McpError) {
         throw error;
@@ -3279,14 +3267,20 @@ Backup Details:
         elementor_data: JSON.stringify(elementorData)
       });
       
-      return {
-        content: [
-          {
-            type: 'text',
-            text: `Container created successfully! Container ID: ${containerId}\nPosition: ${args.position || 'end'}`,
-          },
-        ],
-      };
+      return this.createSuccessResponse(
+        {
+          operation_type: "create_container",
+          container_id: containerId,
+          position: args.position || elementorData.length - 1,
+          post_id: args.post_id,
+          container_settings: {
+            content_width: 'boxed',
+            flex_direction: 'column',
+            ...args.container_settings
+          }
+        },
+        `Container created successfully! Container ID: ${containerId} at position ${args.position || 'end'}`
+      );
     } catch (error: any) {
       if (error instanceof McpError) {
         throw error;
@@ -3381,14 +3375,16 @@ Backup Details:
         elementor_data: JSON.stringify(elementorData)
       });
       
-      return {
-        content: [
-          {
-            type: 'text',
-            text: `Successfully added ${columnsToAdd} column(s) to section ${args.section_id}`,
-          },
-        ],
-      };
+      return this.createSuccessResponse(
+        {
+          operation_type: "add_columns_to_section",
+          section_id: args.section_id,
+          columns_added: columnsToAdd,
+          post_id: args.post_id,
+          new_column_ids: Array.from({length: columnsToAdd}, () => Math.random().toString(36).substr(2, 8))
+        },
+        `Successfully added ${columnsToAdd} column(s) to section ${args.section_id}`
+      );
     } catch (error: any) {
       if (error instanceof McpError) {
         throw error;
@@ -3475,14 +3471,17 @@ Backup Details:
         elementor_data: JSON.stringify(elementorData)
       });
       
-      return {
-        content: [
-          {
-            type: 'text',
-            text: `Section duplicated successfully! New section ID: ${sectionToDuplicate.id}\nInserted at position: ${insertIndex}`,
-          },
-        ],
-      };
+      return this.createSuccessResponse(
+        {
+          operation_type: "duplicate_section",
+          original_section_id: args.section_id,
+          new_section_id: sectionToDuplicate.id,
+          position: insertIndex,
+          post_id: args.post_id,
+          duplicated_elements_count: 1 + (sectionToDuplicate.elements ? sectionToDuplicate.elements.length : 0)
+        },
+        `Section duplicated successfully! New section ID: ${sectionToDuplicate.id} inserted at position: ${insertIndex}`
+      );
     } catch (error: any) {
       if (error instanceof McpError) {
         throw error;
@@ -3730,14 +3729,18 @@ Backup Details:
         elementor_data: JSON.stringify(elementorData)
       });
       
-      return {
-        content: [
-          {
-            type: 'text',
-            text: `Widget inserted successfully! Widget ID: ${widgetId}\nWidget Type: ${args.widget_type}\nInserted ${args.insert_position || 'after'} element: ${args.target_element_id}`,
-          },
-        ],
-      };
+      return this.createSuccessResponse(
+        {
+          operation_type: "insert_widget_at_position",
+          widget_id: widgetId,
+          widget_type: args.widget_type,
+          target_element_id: args.target_element_id,
+          insert_position: args.insert_position || 'after',
+          post_id: args.post_id,
+          widget_settings: args.widget_settings || {}
+        },
+        `Widget inserted successfully! Widget ID: ${widgetId} (${args.widget_type}) ${args.insert_position || 'after'} element: ${args.target_element_id}`
+      );
     } catch (error: any) {
       if (error instanceof McpError) {
         throw error;
@@ -3927,14 +3930,19 @@ Backup Details:
         elementor_data: JSON.stringify(elementorData)
       });
       
-      return {
-        content: [
-          {
-            type: 'text',
-            text: `Widget cloned successfully! New widget ID: ${widgetToClone.id}\nOriginal widget ID: ${args.widget_id}`,
-          },
-        ],
-      };
+      return this.createSuccessResponse(
+        {
+          post_id: args.post_id,
+          original_widget_id: args.widget_id,
+          new_widget_id: widgetToClone.id,
+          widget_type: widgetToClone.widgetType || null,
+          target_element_id: args.target_element_id || null,
+          insert_position: args.insert_position || "after",
+          operation: "widget_cloning",
+          cloned_settings: widgetToClone.settings || {}
+        },
+        `Widget cloned successfully! New widget ID: ${widgetToClone.id}`
+      );
     } catch (error: any) {
       if (error instanceof McpError) {
         throw error;
@@ -3977,19 +3985,28 @@ Backup Details:
       const elementorData = parsedResult.data;
       
       let widgetToMove: any = null;
+      let sourceLocation: any = { column_id: null, previous_position: -1 };
+      let targetLocation: any = { 
+        column_id: args.target_column_id || null, 
+        new_position: args.position !== undefined ? args.position : "end" 
+      };
       
       // Function to find and remove widget
-      const findAndRemoveWidget = (elements: any[]): boolean => {
+      const findAndRemoveWidget = (elements: any[], parent: any = null): boolean => {
         for (let i = 0; i < elements.length; i++) {
           const element = elements[i];
           
           if (element.id === args.widget_id) {
             widgetToMove = elements.splice(i, 1)[0];
+            if (parent && parent.elType === 'column') {
+              sourceLocation.column_id = parent.id;
+              sourceLocation.previous_position = i;
+            }
             return true;
           }
           
           if (element.elements && element.elements.length > 0) {
-            if (findAndRemoveWidget(element.elements)) {
+            if (findAndRemoveWidget(element.elements, element)) {
               return true;
             }
           }
@@ -4016,10 +4033,13 @@ Backup Details:
         for (let element of elements) {
           // If column_id is specified, look for that specific column
           if (args.target_column_id && element.id === args.target_column_id && element.elType === 'column') {
+            targetLocation.column_id = element.id;
             if (args.position !== undefined && args.position >= 0 && args.position < element.elements.length) {
               element.elements.splice(args.position, 0, widgetToMove);
+              targetLocation.new_position = args.position;
             } else {
               element.elements.push(widgetToMove);
+              targetLocation.new_position = element.elements.length - 1;
             }
             return true;
           }
@@ -4028,10 +4048,13 @@ Backup Details:
           if (args.target_section_id && element.id === args.target_section_id && element.elType === 'section') {
             if (element.elements && element.elements.length > 0) {
               const firstColumn = element.elements[0];
+              targetLocation.column_id = firstColumn.id;
               if (args.position !== undefined && args.position >= 0 && args.position < firstColumn.elements.length) {
                 firstColumn.elements.splice(args.position, 0, widgetToMove);
+                targetLocation.new_position = args.position;
               } else {
                 firstColumn.elements.push(widgetToMove);
+                targetLocation.new_position = firstColumn.elements.length - 1;
               }
               return true;
             }
@@ -4066,14 +4089,17 @@ Backup Details:
         elementor_data: JSON.stringify(elementorData)
       });
       
-      return {
-        content: [
-          {
-            type: 'text',
-            text: `Widget moved successfully! Widget ID: ${args.widget_id}\nMoved to: ${args.target_column_id || args.target_section_id}\nPosition: ${args.position || 'end'}`,
-          },
-        ],
-      };
+      return this.createSuccessResponse(
+        {
+          post_id: args.post_id,
+          widget_id: args.widget_id,
+          widget_type: widgetToMove.widgetType || null,
+          source_location: sourceLocation,
+          target_location: targetLocation,
+          operation: "widget_move"
+        },
+        `Widget moved successfully! Widget ID: ${args.widget_id}`
+      );
     } catch (error: any) {
       if (error instanceof McpError) {
         throw error;
@@ -4117,19 +4143,28 @@ Backup Details:
       const elementorData = parsedResult.data;
       
       let elementDeleted = false;
+      let deletedElement: any = null;
+      let parentContainer: any = null;
+      let remainingElementsInParent = 0;
       
       // Function to find and delete element
-      const findAndDeleteElement = (elements: any[]): boolean => {
+      const findAndDeleteElement = (elements: any[], parent: any = null): boolean => {
         for (let i = 0; i < elements.length; i++) {
           const element = elements[i];
           
           if (element.id === args.element_id) {
+            deletedElement = { ...element };
+            parentContainer = parent ? {
+              type: parent.elType,
+              id: parent.id
+            } : null;
             elements.splice(i, 1);
+            remainingElementsInParent = elements.length;
             return true;
           }
           
           if (element.elements && element.elements.length > 0) {
-            if (findAndDeleteElement(element.elements)) {
+            if (findAndDeleteElement(element.elements, element)) {
               return true;
             }
           }
@@ -4159,14 +4194,18 @@ Backup Details:
         elementor_data: JSON.stringify(elementorData)
       });
       
-      return {
-        content: [
-          {
-            type: 'text',
-            text: `Element deleted successfully! Element ID: ${args.element_id}`,
-          },
-        ],
-      };
+      return this.createSuccessResponse(
+        {
+          post_id: args.post_id,
+          deleted_element_id: args.element_id,
+          element_type: deletedElement.elType,
+          widget_type: deletedElement.widgetType || null,
+          parent_container: parentContainer,
+          operation: "element_deletion",
+          remaining_elements_in_parent: remainingElementsInParent
+        },
+        `Element deleted successfully! Element ID: ${args.element_id}`
+      );
     } catch (error: any) {
       if (error instanceof McpError) {
         throw error;
@@ -4209,11 +4248,14 @@ Backup Details:
       const elementorData = parsedResult.data;
       
       let containerFound = false;
+      let containerType = '';
+      let newOrderDetails: any[] = [];
       
       // Function to find container and reorder elements
       const findAndReorderElements = (elements: any[]): boolean => {
         for (let element of elements) {
           if (element.id === args.container_id) {
+            containerType = element.elType;
             const oldElements = [...element.elements];
             const newElements: any[] = [];
             
@@ -4231,6 +4273,14 @@ Backup Details:
                 newElements.push(oldElement);
               }
             }
+            
+            // Track the new order details
+            newOrderDetails = newElements.map((el, index) => ({
+              element_id: el.id,
+              element_type: el.elType,
+              widget_type: el.widgetType || null,
+              position: index
+            }));
             
             element.elements = newElements;
             return true;
@@ -4267,14 +4317,17 @@ Backup Details:
         elementor_data: JSON.stringify(elementorData)
       });
       
-      return {
-        content: [
-          {
-            type: 'text',
-            text: `Elements reordered successfully in container: ${args.container_id}`,
-          },
-        ],
-      };
+      return this.createSuccessResponse(
+        {
+          post_id: args.post_id,
+          container_id: args.container_id,
+          container_type: containerType,
+          elements_reordered: newOrderDetails.length,
+          new_order: newOrderDetails,
+          operation: "element_reordering"
+        },
+        `Elements reordered successfully in container: ${args.container_id}`
+      );
     } catch (error: any) {
       if (error instanceof McpError) {
         throw error;
@@ -4365,6 +4418,10 @@ Backup Details:
         );
       }
       
+      // Track what settings were copied and skipped
+      let settingsCopied: string[] = [];
+      let settingsSkipped: string[] = [];
+      
       // Copy settings
       if (args.settings_to_copy && args.settings_to_copy.length > 0) {
         // Copy specific settings
@@ -4372,11 +4429,17 @@ Backup Details:
           if (sourceElement.settings && sourceElement.settings[setting] !== undefined) {
             if (!targetElement.settings) targetElement.settings = {};
             targetElement.settings[setting] = JSON.parse(JSON.stringify(sourceElement.settings[setting]));
+            settingsCopied.push(setting);
+          } else {
+            settingsSkipped.push(setting);
           }
         }
       } else {
         // Copy all settings
-        targetElement.settings = JSON.parse(JSON.stringify(sourceElement.settings || {}));
+        if (sourceElement.settings) {
+          targetElement.settings = JSON.parse(JSON.stringify(sourceElement.settings));
+          settingsCopied = Object.keys(sourceElement.settings);
+        }
       }
       
       // Update the page
@@ -4385,14 +4448,21 @@ Backup Details:
         elementor_data: JSON.stringify(elementorData)
       });
       
-      return {
-        content: [
-          {
-            type: 'text',
-            text: `Settings copied successfully from ${args.source_element_id} to ${args.target_element_id}`,
-          },
-        ],
-      };
+      return this.createSuccessResponse(
+        {
+          post_id: args.post_id,
+          source_element_id: args.source_element_id,
+          source_element_type: sourceElement.elType,
+          source_widget_type: sourceElement.widgetType || null,
+          target_element_id: args.target_element_id,
+          target_element_type: targetElement.elType,
+          target_widget_type: targetElement.widgetType || null,
+          operation: "settings_copy",
+          settings_copied: settingsCopied,
+          settings_skipped: settingsSkipped
+        },
+        `Settings copied successfully from ${args.source_element_id} to ${args.target_element_id}`
+      );
     } catch (error: any) {
       if (error instanceof McpError) {
         throw error;
@@ -4504,6 +4574,33 @@ Backup Details:
     }
   }
 
+  private async clearElementorCacheGeneral(args: { post_id?: number }) {
+    this.ensureAuthenticated();
+    
+    try {
+      await this.clearElementorCache(args.post_id);
+      
+      return this.createSuccessResponse(
+        {
+          operation: "cache_clear",
+          scope: args.post_id ? "specific_post" : "general",
+          post_id: args.post_id || null,
+          cache_cleared: true
+        },
+        args.post_id 
+          ? `Cache cleared successfully for post/page ID: ${args.post_id}`
+          : "General Elementor cache cleared successfully"
+      );
+    } catch (error: any) {
+      return this.createErrorResponse(
+        `Failed to clear cache: ${error.message}`,
+        "CLEAR_CACHE_ERROR",
+        "API_ERROR",
+        `Cache clearing operation failed${args.post_id ? ` for post/page ${args.post_id}` : ''}`
+      );
+    }
+  }
+
   // Advanced Element Operations
   private async findElementsByType(args: { post_id: number; widget_type: string; include_settings?: boolean }) {
     this.ensureAuthenticated();
@@ -4611,169 +4708,139 @@ Backup Details:
 
   // Global Settings (Requires Elementor Pro)
   private async getElementorGlobalColors(args: any) {
-    return {
-      content: [
-        {
-          type: 'text',
-          text: 'Error: Global settings require Elementor Pro API access. This feature is not available in the free version.',
-        },
-      ],
-    };
+    return this.createErrorResponse(
+      'Global settings require Elementor Pro API access. This feature is not available in the free version.',
+      'PRO_FEATURE_ERROR',
+      'FEATURE_UNAVAILABLE',
+      'Elementor Pro required'
+    );
   }
 
   private async updateElementorGlobalColors(args: any) {
-    return {
-      content: [
-        {
-          type: 'text',
-          text: 'Error: Global settings require Elementor Pro API access. This feature is not available in the free version.',
-        },
-      ],
-    };
+    return this.createErrorResponse(
+      'Global settings require Elementor Pro API access. This feature is not available in the free version.',
+      'PRO_FEATURE_ERROR',
+      'FEATURE_UNAVAILABLE',
+      'Elementor Pro required'
+    );
   }
 
   private async getElementorGlobalFonts(args: any) {
-    return {
-      content: [
-        {
-          type: 'text',
-          text: 'Error: Global settings require Elementor Pro API access. This feature is not available in the free version.',
-        },
-      ],
-    };
+    return this.createErrorResponse(
+      'Global settings require Elementor Pro API access. This feature is not available in the free version.',
+      'PRO_FEATURE_ERROR',
+      'FEATURE_UNAVAILABLE',
+      'Elementor Pro required'
+    );
   }
 
   private async updateElementorGlobalFonts(args: any) {
-    return {
-      content: [
-        {
-          type: 'text',
-          text: 'Error: Global settings require Elementor Pro API access. This feature is not available in the free version.',
-        },
-      ],
-    };
+    return this.createErrorResponse(
+      'Global settings require Elementor Pro API access. This feature is not available in the free version.',
+      'PRO_FEATURE_ERROR',
+      'FEATURE_UNAVAILABLE',
+      'Elementor Pro required'
+    );
   }
 
   // Advanced Operations (Not Yet Implemented)
   private async rebuildPageStructure(args: any) {
-    return {
-      content: [
-        {
-          type: 'text',
-          text: 'Error: Page structure rebuilding is a complex operation not yet implemented. Please use individual element manipulation tools instead.',
-        },
-      ],
-    };
+    return this.createErrorResponse(
+      'Page structure rebuilding is a complex operation not yet implemented. Please use individual element manipulation tools instead.',
+      'NOT_IMPLEMENTED',
+      'FEATURE_UNAVAILABLE',
+      'Use individual element manipulation tools for page building'
+    );
   }
 
   private async validateElementorData(args: any) {
-    return {
-      content: [
-        {
-          type: 'text',
-          text: 'Error: Data validation not yet implemented. Please check data manually using get_elementor_data.',
-        },
-      ],
-    };
+    return this.createErrorResponse(
+      'Data validation not yet implemented. Please check data manually using get_elementor_data.',
+      'NOT_IMPLEMENTED',
+      'FEATURE_UNAVAILABLE',
+      'Use get_elementor_data to manually inspect page structure'
+    );
   }
 
   private async regenerateCSS(args: any) {
-    return {
-      content: [
-        {
-          type: 'text',
-          text: 'Error: CSS regeneration requires direct server access. Please use the Elementor admin interface: Elementor → Tools → Regenerate CSS & Data.',
-        },
-      ],
-    };
+    return this.createErrorResponse(
+      'CSS regeneration requires direct server access. Please use the Elementor admin interface: Elementor → Tools → Regenerate CSS & Data.',
+      'SERVER_ACCESS_REQUIRED',
+      'FEATURE_UNAVAILABLE',
+      'Use WordPress admin: Elementor → Tools → Regenerate CSS & Data'
+    );
   }
 
   private async optimizeElementorAssets(args: any) {
-    return {
-      content: [
-        {
-          type: 'text',
-          text: 'Error: Asset optimization requires direct server access. Please use WordPress optimization plugins or the Elementor admin interface.',
-        },
-      ],
-    };
+    return this.createErrorResponse(
+      'Asset optimization requires direct server access. Please use WordPress optimization plugins or the Elementor admin interface.',
+      'SERVER_ACCESS_REQUIRED',
+      'FEATURE_UNAVAILABLE',
+      'Use WordPress optimization plugins or Elementor admin interface'
+    );
   }
 
   private async bulkUpdateWidgetSettings(args: any) {
-    return {
-      content: [
-        {
-          type: 'text',
-          text: 'Error: Bulk widget updates not yet implemented. Please use individual widget update tools or find_elements_by_type to identify widgets first.',
-        },
-      ],
-    };
+    return this.createErrorResponse(
+      'Bulk widget updates not yet implemented. Please use individual widget update tools or find_elements_by_type to identify widgets first.',
+      'NOT_IMPLEMENTED',
+      'FEATURE_UNAVAILABLE',
+      'Use individual widget update tools or find_elements_by_type'
+    );
   }
 
   private async replaceWidgetContent(args: any) {
-    return {
-      content: [
-        {
-          type: 'text',
-          text: 'Error: Widget content replacement not yet implemented. Please use individual widget update tools.',
-        },
-      ],
-    };
+    return this.createErrorResponse(
+      'Widget content replacement not yet implemented. Please use individual widget update tools.',
+      'NOT_IMPLEMENTED',
+      'FEATURE_UNAVAILABLE',
+      'Use individual widget update tools'
+    );
   }
 
   private async getElementorCustomFields(args: any) {
-    return {
-      content: [
-        {
-          type: 'text',
-          text: 'Error: Custom fields integration not yet implemented. Please use WordPress REST API to access custom fields directly.',
-        },
-      ],
-    };
+    return this.createErrorResponse(
+      'Custom fields integration not yet implemented. Please use WordPress REST API to access custom fields directly.',
+      'NOT_IMPLEMENTED',
+      'FEATURE_UNAVAILABLE',
+      'Use WordPress REST API for custom fields access'
+    );
   }
 
   private async updateDynamicContentSources(args: any) {
-    return {
-      content: [
-        {
-          type: 'text',
-          text: 'Error: Dynamic content management not yet implemented. Please update widget settings manually with dynamic field configurations.',
-        },
-      ],
-    };
+    return this.createErrorResponse(
+      'Dynamic content management not yet implemented. Please update widget settings manually with dynamic field configurations.',
+      'NOT_IMPLEMENTED',
+      'FEATURE_UNAVAILABLE',
+      'Update widget settings manually with dynamic field configurations'
+    );
   }
 
   private async getElementorRevisions(args: any) {
-    return {
-      content: [
-        {
-          type: 'text',
-          text: 'Error: Revision management not yet implemented. Please use WordPress admin interface to access revisions.',
-        },
-      ],
-    };
+    return this.createErrorResponse(
+      'Revision management not yet implemented. Please use WordPress admin interface to access revisions.',
+      'NOT_IMPLEMENTED',
+      'FEATURE_UNAVAILABLE',
+      'Use WordPress admin interface for revision management'
+    );
   }
 
   private async restoreElementorRevision(args: any) {
-    return {
-      content: [
-        {
-          type: 'text',
-          text: 'Error: Revision management not yet implemented. Please use WordPress admin interface to restore revisions.',
-        },
-      ],
-    };
+    return this.createErrorResponse(
+      'Revision management not yet implemented. Please use WordPress admin interface to restore revisions.',
+      'NOT_IMPLEMENTED',
+      'FEATURE_UNAVAILABLE',
+      'Use WordPress admin interface for revision management'
+    );
   }
 
   private async compareElementorRevisions(args: any) {
-    return {
-      content: [
-        {
-          type: 'text',
-          text: 'Error: Revision management not yet implemented. Please use WordPress admin interface to compare revisions.',
-        },
-      ],
-    };
+    return this.createErrorResponse(
+      'Revision management not yet implemented. Please use WordPress admin interface to compare revisions.',
+      'NOT_IMPLEMENTED',
+      'FEATURE_UNAVAILABLE',
+      'Use WordPress admin interface for revision management'
+    );
   }
 
   async run() {
