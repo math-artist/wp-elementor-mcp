@@ -2,6 +2,37 @@
 
 All notable changes to the WordPress Elementor MCP Server will be documented in this file.
 
+## [1.6.7] - 2024-12-21
+
+### 🐛 Bug Fixes - Complete Response Format Consistency
+- **Fixed Missing Structured Responses**: Identified and fixed 6 additional tools that were still using legacy response formats
+- **Enhanced Error Handling**: Updated all stub/placeholder methods to use structured error responses
+- **Consistent JSON Structure**: All tools now return `{status: "success"/"error", data: {...}, message: "..."}` format
+
+### 🔧 Tools Fixed
+- **getElementorData**: Fixed debug/error cases to use structured responses with metadata
+- **getElementorElements**: Enhanced error responses with proper error codes
+- **getElementorDataChunked**: Added pagination helpers and structured chunk information
+- **uploadMedia**: Complete response format overhaul with operation details
+- **All Stub Methods**: Updated 15+ placeholder methods to use structured error responses
+
+### ✨ Enhanced Data Structures
+- **Comprehensive Metadata**: Success responses now include operation type, timestamps, and detailed context
+- **Rich Error Details**: Error responses include proper error codes, types, and actionable details
+- **Pagination Support**: Chunked data operations include navigation helpers
+- **Debug Information**: Enhanced debugging data in structured format
+
+### 🧪 Testing Updates
+- **Verified Test Compatibility**: Confirmed existing test suite works with new response format
+- **Response Validation**: All tests pass structured response validation
+- **100% Coverage**: Every tool now returns consistent structured responses
+
+### 📋 Technical Details
+- All methods now use `createSuccessResponse()` and `createErrorResponse()` helpers
+- Eliminated legacy `{content: [{type: 'text', text: '...'}]}` format entirely
+- Enhanced error categorization with proper error types and codes
+- Improved debugging and troubleshooting information
+
 ## [1.6.5] - 2024-12-19
 
 ### 📋 Structured JSON Responses
