@@ -56,7 +56,7 @@ class ElementorWordPressMCP {
     this.server = new Server(
       {
         name: 'elementor-wordpress-mcp',
-        version: '1.6.7',
+        version: '1.6.8',
       }
     );
 
@@ -1378,7 +1378,7 @@ class ElementorWordPressMCP {
         },
         serverInfo: {
           name: 'elementor-wordpress-mcp',
-          version: '1.6.7',
+          version: '1.6.8',
         },
       };
     });

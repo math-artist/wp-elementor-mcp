@@ -1,7 +1,7 @@
 {
   "name": "wp-elementor-mcp",
-  "version": "1.6.7",
-  "description": "MCP server for interacting with Elementor and WordPress through natural language",
+  "version": "1.6.8",
+  "description": "Model Context Protocol server for WordPress and Elementor integration",
   "main": "dist/index.js",
   "bin": {
     "wp-elementor-mcp": "dist/index.js"
