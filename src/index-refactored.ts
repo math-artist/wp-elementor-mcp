@@ -35,14 +35,15 @@ class ElementorWordPressMCP {
   private wordPressClient: WordPressClient;
   private toolHandlers: ToolHandlers;
   private serverConfig: ServerConfig;
+  private serverInfo = {
+    name: 'elementor-wordpress-mcp',
+    version: '1.6.8'
+  };
 
   constructor() {
     this.serverConfig = getServerConfig();
     
-    this.server = new Server({
-      name: 'elementor-wordpress-mcp',
-      version: '1.6.8',
-    });
+    this.server = new Server(this.serverInfo);
 
     // Initialize components
     this.wordPressClient = new WordPressClient();
@@ -138,7 +139,7 @@ class ElementorWordPressMCP {
             contents: [{
               uri,
               mimeType: 'text/plain',
-              text: `✅ Connected to: ${config.baseUrl}\n👤 User: ${config.username}\n🔧 MCP Server: ${this.server.name} v${this.server.version}`
+              text: `✅ Connected to: ${config.baseUrl}\n👤 User: ${config.username}\n🔧 MCP Server: ${this.serverInfo.name} v${this.serverInfo.version}`
             }]
           };
         } catch (error: any) {
