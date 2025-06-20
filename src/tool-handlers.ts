@@ -2135,8 +2135,8 @@ export class ToolHandlers {
         );
       }
       
-      const elementorData = parsedResult.data;
-      const issues = [];
+      const elementorData = parsedResult.data!;
+      const issues: string[] = [];
       
       // Basic validation checks
       const validateElement = (element: any, path: string) => {
