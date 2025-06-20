@@ -1,6 +1,7 @@
 import axios, { AxiosInstance } from 'axios';
 import https from 'https';
 import { WordPressConfig } from './types.js';
+import { ResponseHelpers } from './helpers.js';
 
 export class WordPressClient {
   private axiosInstance: AxiosInstance | null = null;
@@ -129,8 +130,14 @@ export class WordPressClient {
 
   ensureAuthenticated() {
     if (!this.axiosInstance || !this.config) {
-      throw new Error('WordPress connection not configured. Please set environment variables: WORDPRESS_BASE_URL, WORDPRESS_USERNAME, WORDPRESS_APPLICATION_PASSWORD.');
+      return ResponseHelpers.createErrorResponse(
+        'WordPress connection not configured. Please set environment variables: WORDPRESS_BASE_URL, WORDPRESS_USERNAME, WORDPRESS_APPLICATION_PASSWORD.',
+        'NOT_CONFIGURED',
+        'AUTHENTICATION_ERROR',
+        'Missing WordPress connection configuration'
+      );
     }
+    return null; // null means authenticated successfully
   }
 
   // Utility method to handle large responses with better error reporting
