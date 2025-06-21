@@ -12,13 +12,13 @@ The MCP server automatically detects local development environments and allows s
 
 - `localhost`
 - `127.0.0.1` 
-- `*.local` (e.g., `mysite.local`, `joincollectiveos.local`)
+- `*.local` (e.g., `mysite.local`)
 - `*.dev` (e.g., `mysite.dev`)
 - `*.test` (e.g., `mysite.test`)
 
 When connecting to these domains, you'll see:
 ```
-🔓 Allowing self-signed certificates for local development site: joincollectiveos.local
+🔓 Allowing self-signed certificates for local development site: mysite.local
 ```
 
 ### 🔒 Production Sites (Valid Certificates Required)
