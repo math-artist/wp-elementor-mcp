@@ -23,6 +23,7 @@
     "start:full": "ELEMENTOR_ENABLE_ALL=true node dist/index.js",
     "test": "node test-server.js",
     "test:validate": "node validation-test.js",
+    "test:performance": "node test-performance-optimizations.js",
     "test:enhanced": "node test-enhanced-features.js", 
     "test:comprehensive": "node comprehensive-test.js",
     "test:ci": "npm run test && npm run test:validate && npm run test:enhanced && npm run test:comprehensive",

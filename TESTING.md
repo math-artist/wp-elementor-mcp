@@ -10,14 +10,15 @@ This document provides comprehensive information about testing the Elementor Wor
 - **Tool Categories**: 11/11 covered ✅ 
 - **Configuration Modes**: 4 different modes tested ✅
 - **Performance**: Average 1ms validation time ✅
+- **Performance Optimization**: New benchmarking suite ✅
 
 ### Test Coverage by Mode
-| Mode | Tools | Validation | Status |
-|------|-------|------------|--------|
-| Essential | 20 | 100% | ✅ Ready |
-| Standard | 32 | 100% | ✅ Ready |
-| Advanced | 34 | 100% | ✅ Ready |
-| Full | 34 | 100% | ✅ Ready |
+| Mode | Tools | Validation | Performance | Status |
+|------|-------|------------|-------------|--------|
+| Essential | 20 | 100% | ✅ Optimized | ✅ Ready |
+| Standard | 32 | 100% | ✅ Optimized | ✅ Ready |
+| Advanced | 34 | 100% | ✅ Optimized | ✅ Ready |
+| Full | 34 | 100% | ✅ Optimized | ✅ Ready |
 
 ## 🚀 Quick Start Testing
 
@@ -36,6 +37,25 @@ npm run test:ci
 - Enhanced features testing (`npm run test:enhanced`)
 - Comprehensive tool testing (`npm run test:comprehensive`)
 
+### Performance Testing (NEW in v1.7.0)
+```bash
+# Test performance optimizations
+npm run test:performance
+
+# Or run the performance test file directly
+node test-performance-optimizations.js
+```
+**Purpose**: Validate performance improvements and benchmark tools
+**Time**: ~3-5 minutes
+**Requirements**: WordPress credentials for real performance testing
+
+**What it tests**:
+- Data payload size reductions (get_posts, get_pages)
+- Response time improvements
+- Memory usage optimization
+- Performance regression detection
+- Real-world scenarios with various data sizes
+
 ### Individual Test Suites
 ```bash
 # Basic server functionality
@@ -44,7 +64,10 @@ npm test
 # Schema and structure validation  
 npm run test:validate
 
-# Performance optimizations & enhanced features
+# Performance optimizations (NEW)
+npm run test:performance
+
+# Enhanced features testing
 npm run test:enhanced
 
 # Comprehensive tool functionality
