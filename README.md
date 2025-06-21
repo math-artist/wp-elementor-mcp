@@ -175,7 +175,7 @@ ELEMENTOR_ENABLE_PERFORMANCE=true
 **Basic Elementor:**
 - `get_elementor_templates`, `get_elementor_data`, `update_elementor_data`
 - `get_elementor_widget`, `update_elementor_widget`, `get_elementor_elements`
-- `update_elementor_section`, `get_elementor_data_chunked`
+- `update_elementor_section`, `get_elementor_data_smart`, `get_elementor_structure_summary`
 - `backup_elementor_data`, `clear_elementor_cache`
 
 ### Standard Mode (+12 tools = 32 total)
@@ -197,7 +197,7 @@ ELEMENTOR_ENABLE_PERFORMANCE=true
 - `copy_element_settings` - Copy settings between elements
 
 **Page Analysis:**
-- `get_page_structure` - Get simplified page overview
+
 
 ### Advanced Mode (+2 tools)
 **Performance:**

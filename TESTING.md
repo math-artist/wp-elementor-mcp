@@ -21,29 +21,46 @@ This document provides comprehensive information about testing the Elementor Wor
 
 ## 🚀 Quick Start Testing
 
-### 1. Basic Server Test
+### Essential Testing (CI/CD)
 ```bash
-npm test
+# Run all CI tests (recommended for most users)
+npm run test:ci
 ```
-**Purpose**: Verify server starts correctly and MCP protocol works
-**Time**: ~5 seconds
-**Requirements**: None
-
-### 2. Schema Validation
-```bash
-npm run test:validate
-```
-**Purpose**: Validate all tool schemas and structure
-**Time**: ~30 seconds
+**Purpose**: Complete validation of core functionality
+**Time**: ~1-2 minutes
 **Requirements**: None (no WordPress connection needed)
 
-### 3. Test Summary
+**What it includes**:
+- Server startup validation (`npm test`)
+- Schema validation (`npm run test:validate`) 
+- Enhanced features testing (`npm run test:enhanced`)
+- Comprehensive tool testing (`npm run test:comprehensive`)
+
+### Individual Test Suites
 ```bash
-npm run test:summary
+# Basic server functionality
+npm test
+
+# Schema and structure validation  
+npm run test:validate
+
+# Performance optimizations & enhanced features
+npm run test:enhanced
+
+# Comprehensive tool functionality
+npm run test:comprehensive
 ```
-**Purpose**: Get comprehensive overview with recommendations
-**Time**: ~45 seconds
-**Requirements**: None
+
+### Extended Testing
+```bash
+# All tests including manual testing tools
+npm run test:all
+
+# Individual extended tests
+npm run test:tools      # Tool-specific tests
+npm run test:summary    # Detailed summary report
+npm run test:credentials # WordPress credential testing
+```
 
 ## 🔬 Detailed Testing
 

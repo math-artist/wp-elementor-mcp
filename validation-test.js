@@ -7,10 +7,10 @@ import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
 const VALIDATION_CONFIG = {
   modes: ['essential', 'standard', 'advanced', 'full'],
   expectedToolCounts: {
-    essential: 21,  // Added list_all_content
-    standard: 33,   // Added list_all_content
-    advanced: 35,   // Added list_all_content
-    full: 35        // Added list_all_content
+    essential: 21,  // Basic WordPress + Elementor operations
+    standard: 32,   // + Section and widget management
+    advanced: 33,   // + Performance and advanced operations
+    full: 33        // + All pro features (template, global, custom fields)
   }
 };
 
@@ -298,13 +298,13 @@ function validateInputSchema(tool) {
 
 function classifyTool(toolName) {
   const categories = {
-    'WordPress Core': ['get_posts', 'get_post', 'create_post', 'update_post', 'get_pages', 'create_page', 'update_page', 'get_media', 'upload_media', 'configure_wordpress', 'list_all_content'],
-    'Basic Elementor': ['get_elementor_data', 'update_elementor_data', 'get_elementor_widget', 'update_elementor_widget', 'get_elementor_elements', 'update_elementor_section', 'get_elementor_data_chunked', 'get_elementor_templates'],
+    'WordPress Core': ['get_posts', 'get_post', 'create_post', 'update_post', 'get_pages', 'get_page', 'create_page', 'update_page', 'get_media', 'upload_media', 'configure_wordpress', 'list_all_content'],
+    'Basic Elementor': ['get_elementor_data', 'update_elementor_data', 'get_elementor_widget', 'update_elementor_widget', 'get_elementor_elements', 'update_elementor_section', 'get_elementor_data_smart', 'get_elementor_structure_summary', 'get_elementor_templates'],
     'Section Management': ['create_elementor_section', 'create_elementor_container', 'add_column_to_section', 'duplicate_section'],
     'Widget Operations': ['add_widget_to_section', 'insert_widget_at_position', 'clone_widget', 'move_widget'],
     'Element Management': ['delete_elementor_element', 'reorder_elements', 'copy_element_settings'],
-    'Page Structure': ['get_page_structure'],
-    'Performance': ['clear_elementor_cache', 'clear_elementor_cache_by_page'],
+
+          'Performance': ['clear_elementor_cache'],
     'Advanced Operations': ['find_elements_by_type', 'backup_elementor_data'],
     'Templates': ['create_template', 'update_template', 'delete_template'],
     'Global Settings': ['get_global_colors', 'update_global_colors', 'get_global_fonts', 'update_global_fonts'],
