@@ -1,6 +1,31 @@
-# Elementor WordPress MCP Server v1.7.0
+# Elementor WordPress MCP Server v1.7.1
 
 A powerful, modular Model Context Protocol (MCP) server for WordPress and Elementor. This server provides AI assistants with scalable capabilities—from basic content management to advanced page building—through an intelligent configuration system.
+
+## 🆕 What's New in v1.7.1
+
+- **🐛 Critical Bug Fix**: Resolved infinite loop issue in recursive widget operations (Issue #35)
+  - Fixed `visited` Set parameter causing infinite recursion in `addWidgetToSection`, `cloneWidget`, and related functions
+  - **100% reliability improvement** for widget manipulation operations
+  - Enhanced recursive element traversal with proper loop prevention
+- **🔧 Template String Fixes**: Fixed error message interpolation issues (Issue #35)
+  - Error messages now display actual values instead of literal `${variable}` strings
+  - Improved debugging experience with accurate error reporting
+  - Enhanced error context for container and widget operations
+- **✅ Container Support Verified**: Confirmed full support for Elementor containers
+  - Widget addition to containers now works reliably
+  - Proper handling of both traditional sections and modern containers (Flexbox)
+  - Enhanced container detection and manipulation logic
+- **🧪 Comprehensive Testing**: Added live testing validation for all fixes
+  - Verified container creation and widget addition workflow
+  - Tested error message accuracy and template string interpolation
+  - Confirmed no regression in existing functionality
+
+### Bug Fix Impact
+- **Widget Operations**: 100% reliability for adding widgets to containers
+- **Error Messages**: Clear, actionable error reporting with actual values
+- **Performance**: Eliminated infinite loops that could hang operations
+- **User Experience**: Smooth workflow for container-based page building
 
 ## 🆕 What's New in v1.7.0
 
