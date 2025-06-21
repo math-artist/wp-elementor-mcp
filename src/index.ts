@@ -56,7 +56,7 @@ class ElementorWordPressMCP {
     this.server = new Server(
       {
         name: 'elementor-wordpress-mcp',
-        version: '1.7.0',
+        version: '1.7.1',
       }
     );
 
@@ -1406,7 +1406,7 @@ class ElementorWordPressMCP {
         },
         serverInfo: {
           name: 'elementor-wordpress-mcp',
-          version: '1.7.0',
+          version: '1.7.1',
         },
       };
     });
@@ -1454,7 +1454,7 @@ class ElementorWordPressMCP {
       return this.createErrorResponse(
 
 
-        "Unknown resource: ${uri}",
+                  `Unknown resource: ${uri}`,
 
 
         "OPERATION_ERROR",
@@ -2833,7 +2833,7 @@ Suggestions:
       if (!sectionFound) {
         return this.createErrorResponse(
 
-          "Section ID ${args.section_id} not found in Elementor data",
+          `Section ID ${args.section_id} not found in Elementor data`,
 
           "OPERATION_ERROR",
 
@@ -2866,15 +2866,10 @@ Suggestions:
             postType = 'page';
           } catch (pageError: any) {
             return this.createErrorResponse(
-
-              "Post/Page ID ${args.post_id} not found in posts or pages",
-
+              `Post/Page ID ${args.post_id} not found in posts or pages`,
               "OPERATION_ERROR",
-
               "API_ERROR",
-
               "Operation failed"
-
             );
           }
         } else {
@@ -2905,15 +2900,10 @@ Suggestions:
         throw error;
       }
       return this.createErrorResponse(
-
-        "Failed to update Elementor section: ${error.response?.data?.message || error.message}",
-
+        `Failed to update Elementor section: ${error.response?.data?.message || error.message}`,
         "OPERATION_ERROR",
-
         "API_ERROR",
-
         "Operation failed"
-
       );
     }
   }
@@ -3171,15 +3161,10 @@ Suggestions:
       
       if (!parsedResult.success || !parsedResult.data) {
         return this.createErrorResponse(
-
-          "Failed to get Elementor data for post/page ID ${args.post_id}: ${parsedResult.error || 'Unknown error'}",
-
+          `Failed to get Elementor data for post/page ID ${args.post_id}: ${parsedResult.error || 'Unknown error'}`,
           "OPERATION_ERROR",
-
           "API_ERROR",
-
           "Operation failed"
-
         );
       }
       
@@ -3205,7 +3190,7 @@ Suggestions:
           } catch (pageError: any) {
             return this.createErrorResponse(
 
-              "Post/Page ID ${args.post_id} not found in posts or pages",
+              `Post/Page ID ${args.post_id} not found in posts or pages`,
 
               "OPERATION_ERROR",
 
@@ -3262,15 +3247,10 @@ Suggestions:
         throw error;
       }
       return this.createErrorResponse(
-
-        "Failed to backup Elementor data: ${error.response?.data?.message || error.message}",
-
+        `Failed to backup Elementor data: ${error.response?.data?.message || error.message}`,
         "OPERATION_ERROR",
-
         "API_ERROR",
-
         "Operation failed"
-
       );
     }
   }
@@ -3502,7 +3482,7 @@ Suggestions:
       }
       return this.createErrorResponse(
 
-        "Failed to create section: ${error.message}",
+        `Failed to create section: ${error.message}`,
 
         "OPERATION_ERROR",
 
@@ -3576,7 +3556,7 @@ Suggestions:
       }
       return this.createErrorResponse(
 
-        "Failed to create container: ${error.message}",
+        `Failed to create container: ${error.message}`,
 
         "OPERATION_ERROR",
 
@@ -3598,7 +3578,7 @@ Suggestions:
       if (!parsedResult.success || !parsedResult.data) {
         return this.createErrorResponse(
 
-          "Failed to get Elementor data for post/page ID ${args.post_id}: ${parsedResult.error || 'Unknown error'}",
+          `Failed to get Elementor data for post/page ID ${args.post_id}: ${parsedResult.error || 'Unknown error'}`,
 
           "OPERATION_ERROR",
 
@@ -3646,15 +3626,10 @@ Suggestions:
       
       if (!sectionFound) {
         return this.createErrorResponse(
-
-          "Section ID ${args.section_id} not found",
-
+          `Section ID ${args.section_id} not found`,
           "OPERATION_ERROR",
-
           "API_ERROR",
-
           "Operation failed"
-
         );
       }
       
@@ -3679,15 +3654,10 @@ Suggestions:
         throw error;
       }
       return this.createErrorResponse(
-
-        "Failed to add columns to section: ${error.message}",
-
+        `Failed to add columns to section: ${error.message}`,
         "OPERATION_ERROR",
-
         "API_ERROR",
-
         "Operation failed"
-
       );
     }
   }
@@ -3701,15 +3671,10 @@ Suggestions:
       
       if (!parsedResult.success || !parsedResult.data) {
         return this.createErrorResponse(
-
-          "Failed to get Elementor data for post/page ID ${args.post_id}: ${parsedResult.error || 'Unknown error'}",
-
+          `Failed to get Elementor data for post/page ID ${args.post_id}: ${parsedResult.error || 'Unknown error'}`,
           "OPERATION_ERROR",
-
           "API_ERROR",
-
           "Operation failed"
-
         );
       }
       
@@ -3729,15 +3694,10 @@ Suggestions:
       
       if (!sectionToDuplicate) {
         return this.createErrorResponse(
-
-          "Section ID ${args.section_id} not found",
-
+          `Section ID ${args.section_id} not found`,
           "OPERATION_ERROR",
-
           "API_ERROR",
-
           "Operation failed"
-
         );
       }
       
@@ -3776,15 +3736,10 @@ Suggestions:
         throw error;
       }
       return this.createErrorResponse(
-
-        "Failed to duplicate section: ${error.message}",
-
+        `Failed to duplicate section: ${error.message}`,
         "OPERATION_ERROR",
-
         "API_ERROR",
-
         "Operation failed"
-
       );
     }
   }
@@ -3805,15 +3760,10 @@ Suggestions:
       if (!parsedResult.success || !parsedResult.data) {
         console.error(`❌ Failed to get Elementor data: ${parsedResult.error}`);
         return this.createErrorResponse(
-
-          "Failed to get Elementor data for post/page ID ${args.post_id}: ${parsedResult.error || 'Unknown error'}. Cannot add widget.",
-
+          `Failed to get Elementor data for post/page ID ${args.post_id}: ${parsedResult.error || 'Unknown error'}. Cannot add widget.`,
           "OPERATION_ERROR",
-
           "API_ERROR",
-
           "Operation failed"
-
         );
       }
       
@@ -3836,7 +3786,8 @@ Suggestions:
       let targetFound = false;
       
       // Function to find target container and add widget
-      const findAndAddWidget = (elements: any[], visited = new Set()): boolean => {
+      const visited = new Set(); // Create visited set once, outside the function
+      const findAndAddWidget = (elements: any[]): boolean => {
         for (let element of elements) {
           // Prevent infinite recursion by tracking visited elements
           if (visited.has(element.id)) {
@@ -3854,16 +3805,27 @@ Suggestions:
             return true;
           }
           
-          // If section_id is specified, add to first column of that section
-          if (args.section_id && element.id === args.section_id && element.elType === 'section') {
-            if (element.elements && element.elements.length > 0) {
-              const firstColumn = element.elements[0];
-              if (args.position !== undefined && args.position >= 0 && args.position < firstColumn.elements.length) {
-                firstColumn.elements.splice(args.position, 0, newWidget);
+          // If section_id is specified, add to section or container
+          if (args.section_id && element.id === args.section_id && (element.elType === 'section' || element.elType === 'container')) {
+            if (element.elType === 'container') {
+              // For containers, add widget directly
+              if (args.position !== undefined && args.position >= 0 && args.position < element.elements.length) {
+                element.elements.splice(args.position, 0, newWidget);
               } else {
-                firstColumn.elements.push(newWidget);
+                element.elements.push(newWidget);
               }
               return true;
+            } else if (element.elType === 'section') {
+              // For sections, add to first column
+              if (element.elements && element.elements.length > 0) {
+                const firstColumn = element.elements[0];
+                if (args.position !== undefined && args.position >= 0 && args.position < firstColumn.elements.length) {
+                  firstColumn.elements.splice(args.position, 0, newWidget);
+                } else {
+                  firstColumn.elements.push(newWidget);
+                }
+                return true;
+              }
             }
           }
           
@@ -3877,7 +3839,7 @@ Suggestions:
           
           // Recursively search
           if (element.elements && element.elements.length > 0) {
-            if (findAndAddWidget(element.elements, visited)) {
+            if (findAndAddWidget(element.elements)) {
               return true;
             }
           }
@@ -3889,15 +3851,10 @@ Suggestions:
       
       if (!targetFound) {
         return this.createErrorResponse(
-
-          "Target container not found (section_id: ${args.section_id}, column_id: ${args.column_id})",
-
+          `Target container not found (section_id: ${args.section_id}, column_id: ${args.column_id})`,
           "OPERATION_ERROR",
-
           "API_ERROR",
-
           "Operation failed"
-
         );
       }
       
@@ -3923,15 +3880,10 @@ Suggestions:
         throw error;
       }
       return this.createErrorResponse(
-
-        "Failed to add widget: ${error.message}",
-
+        `Failed to add widget: ${error.message}`,
         "OPERATION_ERROR",
-
         "API_ERROR",
-
         "Operation failed"
-
       );
     }
   }
@@ -3945,15 +3897,10 @@ Suggestions:
       
       if (!parsedResult.success || !parsedResult.data) {
         return this.createErrorResponse(
-
-          "Failed to get Elementor data for post/page ID ${args.post_id}: ${parsedResult.error || 'Unknown error'}",
-
+          `Failed to get Elementor data for post/page ID ${args.post_id}: ${parsedResult.error || 'Unknown error'}`,
           "OPERATION_ERROR",
-
           "API_ERROR",
-
           "Operation failed"
-
         );
       }
       
@@ -4001,7 +3948,7 @@ Suggestions:
       if (!targetFound) {
         return this.createErrorResponse(
 
-          "Target element ID ${args.target_element_id} not found",
+          `Target element ID ${args.target_element_id} not found`,
 
           "OPERATION_ERROR",
 
@@ -4036,7 +3983,7 @@ Suggestions:
       }
       return this.createErrorResponse(
 
-        "Failed to insert widget: ${error.message}",
+        `Failed to insert widget: ${error.message}`,
 
         "OPERATION_ERROR",
 
@@ -4058,7 +4005,7 @@ Suggestions:
       if (!parsedResult.success || !parsedResult.data) {
         return this.createErrorResponse(
 
-          "Failed to get Elementor data for post/page ID ${args.post_id}: ${parsedResult.error || 'Unknown error'}",
+          `Failed to get Elementor data for post/page ID ${args.post_id}: ${parsedResult.error || 'Unknown error'}`,
 
           "OPERATION_ERROR",
 
@@ -4074,20 +4021,21 @@ Suggestions:
       let widgetToClone: any = null;
       
       // Function to find widget to clone
-      const findWidget = (elements: any[], visited = new Set()): any => {
+      const findWidgetVisited = new Set(); // Create visited set once, outside the function
+      const findWidget = (elements: any[]): any => {
         for (let element of elements) {
           // Prevent infinite recursion by tracking visited elements
-          if (visited.has(element.id)) {
+          if (findWidgetVisited.has(element.id)) {
             continue;
           }
-          visited.add(element.id);
+          findWidgetVisited.add(element.id);
           
           if (element.id === args.widget_id) {
             return JSON.parse(JSON.stringify(element)); // Deep copy
           }
           
           if (element.elements && element.elements.length > 0) {
-            const found = findWidget(element.elements, visited);
+            const found = findWidget(element.elements);
             if (found) return found;
           }
         }
@@ -4099,7 +4047,7 @@ Suggestions:
       if (!widgetToClone) {
         return this.createErrorResponse(
 
-          "Widget ID ${args.widget_id} not found",
+          `Widget ID ${args.widget_id} not found`,
 
           "OPERATION_ERROR",
 
@@ -4125,15 +4073,16 @@ Suggestions:
         // Insert at specific position
         let targetFound = false;
         
-        const findAndInsertWidget = (elements: any[], parent: any, visited = new Set()): boolean => {
+        const insertWidgetVisited = new Set(); // Create visited set once, outside the function
+        const findAndInsertWidget = (elements: any[], parent: any): boolean => {
           for (let i = 0; i < elements.length; i++) {
             const element = elements[i];
             
             // Prevent infinite recursion by tracking visited elements
-            if (visited.has(element.id)) {
+            if (insertWidgetVisited.has(element.id)) {
               continue;
             }
-            visited.add(element.id);
+            insertWidgetVisited.add(element.id);
             
             if (element.id === args.target_element_id) {
               const insertIndex = args.insert_position === 'before' ? i : i + 1;
@@ -4142,7 +4091,7 @@ Suggestions:
             }
             
             if (element.elements && element.elements.length > 0) {
-              if (findAndInsertWidget(element.elements, element, visited)) {
+              if (findAndInsertWidget(element.elements, element)) {
                 return true;
               }
             }
@@ -4156,7 +4105,7 @@ Suggestions:
         if (!targetFound) {
           return this.createErrorResponse(
 
-            "Target element ID ${args.target_element_id} not found",
+            `Target element ID ${args.target_element_id} not found`,
 
             "OPERATION_ERROR",
 
@@ -4168,13 +4117,14 @@ Suggestions:
         }
       } else {
         // Add to first available column or container
-        const findFirstContainer = (elements: any[], visited = new Set()): boolean => {
+        const containerVisited = new Set(); // Create visited set once, outside the function
+        const findFirstContainer = (elements: any[]): boolean => {
           for (let element of elements) {
             // Prevent infinite recursion by tracking visited elements
-            if (visited.has(element.id)) {
+            if (containerVisited.has(element.id)) {
               continue;
             }
-            visited.add(element.id);
+            containerVisited.add(element.id);
             
             // Check for traditional column
             if (element.elType === 'column') {
@@ -4189,7 +4139,7 @@ Suggestions:
             }
             
             if (element.elements && element.elements.length > 0) {
-              if (findFirstContainer(element.elements, visited)) {
+              if (findFirstContainer(element.elements)) {
                 return true;
               }
             }
@@ -4238,7 +4188,7 @@ Suggestions:
       }
       return this.createErrorResponse(
 
-        "Failed to clone widget: ${error.message}",
+        `Failed to clone widget: ${error.message}`,
 
         "OPERATION_ERROR",
 
@@ -4260,7 +4210,7 @@ Suggestions:
       if (!parsedResult.success || !parsedResult.data) {
         return this.createErrorResponse(
 
-          "Failed to get Elementor data for post/page ID ${args.post_id}: ${parsedResult.error || 'Unknown error'}",
+          `Failed to get Elementor data for post/page ID ${args.post_id}: ${parsedResult.error || 'Unknown error'}`,
 
           "OPERATION_ERROR",
 
@@ -4361,7 +4311,7 @@ Suggestions:
       if (!findTargetAndAddWidget(elementorData)) {
         return this.createErrorResponse(
 
-          "Target container not found (section_id: ${args.target_section_id}, column_id: ${args.target_column_id})",
+          `Target container not found (section_id: ${args.target_section_id}, column_id: ${args.target_column_id})`,
 
           "OPERATION_ERROR",
 
@@ -4394,15 +4344,10 @@ Suggestions:
         throw error;
       }
       return this.createErrorResponse(
-
-        "Failed to move widget: ${error.message}",
-
+        `Failed to move widget: ${error.message}`,
         "OPERATION_ERROR",
-
         "API_ERROR",
-
         "Operation failed"
-
       );
     }
   }
@@ -4417,15 +4362,10 @@ Suggestions:
       
       if (!parsedResult.success || !parsedResult.data) {
         return this.createErrorResponse(
-
-          "Failed to get Elementor data for post/page ID ${args.post_id}: ${parsedResult.error || 'Unknown error'}",
-
+          `Failed to get Elementor data for post/page ID ${args.post_id}: ${parsedResult.error || 'Unknown error'}`,
           "OPERATION_ERROR",
-
           "API_ERROR",
-
           "Operation failed"
-
         );
       }
       
@@ -4465,15 +4405,10 @@ Suggestions:
       
       if (!elementDeleted) {
         return this.createErrorResponse(
-
-          "Element ID ${args.element_id} not found",
-
+          `Element ID ${args.element_id} not found`,
           "OPERATION_ERROR",
-
           "API_ERROR",
-
           "Operation failed"
-
         );
       }
       
@@ -4501,7 +4436,7 @@ Suggestions:
       }
       return this.createErrorResponse(
 
-        "Failed to delete element: ${error.message}",
+        `Failed to delete element: ${error.message}`,
 
         "OPERATION_ERROR",
 
@@ -4589,7 +4524,7 @@ Suggestions:
       if (!containerFound) {
         return this.createErrorResponse(
 
-          "Container ID ${args.container_id} not found",
+          `Container ID ${args.container_id} not found`,
 
           "OPERATION_ERROR",
 
@@ -4623,7 +4558,7 @@ Suggestions:
       }
       return this.createErrorResponse(
 
-        "Failed to reorder elements: ${error.message}",
+        `Failed to reorder elements: ${error.message}`,
 
         "OPERATION_ERROR",
 
@@ -4645,7 +4580,7 @@ Suggestions:
       if (!parsedResult.success || !parsedResult.data) {
         return this.createErrorResponse(
 
-          "Failed to get Elementor data for post/page ID ${args.post_id}: ${parsedResult.error || 'Unknown error'}",
+          `Failed to get Elementor data for post/page ID ${args.post_id}: ${parsedResult.error || 'Unknown error'}`,
 
           "OPERATION_ERROR",
 
@@ -4682,7 +4617,7 @@ Suggestions:
       if (!sourceElement) {
         return this.createErrorResponse(
 
-          "Source element ID ${args.source_element_id} not found",
+          `Source element ID ${args.source_element_id} not found`,
 
           "OPERATION_ERROR",
 
@@ -4758,7 +4693,7 @@ Suggestions:
       }
       return this.createErrorResponse(
 
-        "Failed to copy element settings: ${error.message}",
+        `Failed to copy element settings: ${error.message}`,
 
         "OPERATION_ERROR",
 
