@@ -9,13 +9,13 @@ async function testTools() {
   
   try {
     // Start the server
-    const serverProcess = spawn('node', ['dist/index.js'], {
+    const serverProcess = spawn('node', ['dist/index-refactored.js'], {
       stdio: ['pipe', 'pipe', 'inherit']
     });
 
     const transport = new StdioClientTransport({
       command: 'node',
-      args: ['dist/index.js']
+      args: ['dist/index-refactored.js']
     });
 
     const client = new Client({

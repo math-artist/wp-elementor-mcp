@@ -88,7 +88,7 @@ async function testEnhancedFeaturesForMode(mode) {
     
     transport = new StdioClientTransport({
       command: 'node',
-      args: ['dist/index.js'],
+      args: ['dist/index-refactored.js'],
       env
     });
 
