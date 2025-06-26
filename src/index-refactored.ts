@@ -37,7 +37,7 @@ class ElementorWordPressMCP {
   private serverConfig: ServerConfig;
   private serverInfo = {
     name: 'elementor-wordpress-mcp',
-    version: '1.6.8'
+    version: '1.7.1'
   };
 
   constructor() {
@@ -74,11 +74,21 @@ class ElementorWordPressMCP {
         toolSchemas.backup_elementor_data_to_file
       );
 
+      // Add basic WordPress operations
+      tools.push(
+        toolSchemas.get_page
+      );
+
+      // Add smart Elementor operations (replacing old tools)
+      tools.push(
+        toolSchemas.get_elementor_data_smart,
+        toolSchemas.get_elementor_structure_summary
+      );
+
       // Add original operations based on server config
       if (this.serverConfig.basicElementorOperations) {
         tools.push(
           toolSchemas.get_elementor_data,
-          toolSchemas.get_page_structure,
           toolSchemas.backup_elementor_data
         );
       }

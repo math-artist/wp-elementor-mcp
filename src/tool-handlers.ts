@@ -29,6 +29,8 @@ export class ToolHandlers {
           return await this.updatePost(args);
         case 'get_pages':
           return await this.getPages(args);
+        case 'get_page':
+          return await this.getPage(args);
         case 'list_all_content':
           return await this.listAllContent(args);
         case 'create_page':
@@ -57,8 +59,10 @@ export class ToolHandlers {
           return await this.getElementorElements(args);
         case 'update_elementor_section':
           return await this.updateElementorSection(args);
-        case 'get_elementor_data_chunked':
-          return await this.getElementorDataChunked(args);
+        case 'get_elementor_data_smart':
+          return await this.getElementorDataSmart(args);
+        case 'get_elementor_structure_summary':
+          return await this.getElementorStructureSummary(args);
         case 'backup_elementor_data':
           return await this.backupElementorData(args);
 
@@ -129,7 +133,7 @@ export class ToolHandlers {
     const params: any = {
       per_page: args.per_page || 10,
       status: args.status || 'publish',
-      context: 'edit'
+      context: 'view' // Use 'view' instead of 'edit' for lighter responses
     };
     
     if (args.search) {
@@ -299,7 +303,7 @@ export class ToolHandlers {
     const params = {
       per_page: args.per_page || 10,
       status: args.status || 'publish',
-      context: 'edit'
+      context: 'view' // Use 'view' instead of 'edit' for lighter responses
     };
 
     try {
@@ -335,6 +339,53 @@ export class ToolHandlers {
       return ResponseHelpers.createErrorResponse(
         `Failed to fetch pages: ${error.response?.status} ${error.response?.statusText} - ${error.response?.data?.message || error.message}`,
         'FETCH_PAGES_ERROR',
+        'API_ERROR',
+        `HTTP ${error.response?.status}: ${error.response?.statusText}`
+      );
+    }
+  }
+
+  private async getPage(args: { id: number }): Promise<any> {
+    const authCheck = this.wordPressClient.ensureAuthenticated();
+    if (authCheck) return authCheck;
+    
+    try {
+      console.error(`Fetching page with ID: ${args.id}`);
+      
+      const axios = this.wordPressClient.getAxiosInstance();
+      const response = await axios.get(`pages/${args.id}`, {
+        params: { context: 'view' }
+      });
+      
+      const page = response.data;
+      
+      return ResponseHelpers.createSuccessResponse(
+        {
+          id: page.id,
+          title: page.title.rendered,
+          content: page.content.rendered,
+          excerpt: page.excerpt.rendered,
+          status: page.status,
+          slug: page.slug,
+          date: page.date,
+          modified: page.modified,
+          link: page.link,
+          author: page.author,
+          parent: page.parent,
+          menu_order: page.menu_order,
+          featured_media: page.featured_media,
+          comment_status: page.comment_status,
+          ping_status: page.ping_status,
+          template: page.template,
+          meta: page.meta,
+          elementor_status: page.meta && page.meta._elementor_edit_mode ? 'full' : 'none'
+        },
+        `Successfully retrieved page ID ${args.id}: "${page.title.rendered}"`
+      );
+    } catch (error: any) {
+      return ResponseHelpers.createErrorResponse(
+        `Failed to fetch page ID ${args.id}: ${error.response?.data?.message || error.message}`,
+        'FETCH_PAGE_ERROR',
         'API_ERROR',
         `HTTP ${error.response?.status}: ${error.response?.statusText}`
       );
@@ -1138,11 +1189,13 @@ export class ToolHandlers {
     }
   }
 
-  private async getElementorDataChunked(args: { post_id: number; chunk_size?: number; chunk_index?: number }): Promise<any> {
+  private async getElementorDataSmart(args: { post_id: number; max_depth?: number; element_index?: number; include_widget_previews?: boolean }): Promise<any> {
     const authCheck = this.wordPressClient.ensureAuthenticated();
     if (authCheck) return authCheck;
     
     try {
+      console.error(`🔍 Getting smart Elementor data for ID: ${args.post_id}, element index: ${args.element_index || 0}`);
+      
       const parsedResult = await this.elementorHandler.safeGetElementorData(args.post_id);
       
       if (!parsedResult.success || !parsedResult.data) {
@@ -1150,59 +1203,179 @@ export class ToolHandlers {
           `Failed to get Elementor data for post/page ID ${args.post_id}: ${parsedResult.error || 'Unknown error'}`,
           'ELEMENTOR_DATA_ERROR',
           'DATA_ERROR',
-          'Could not retrieve or parse Elementor data for chunked access'
+          'Could not retrieve or parse Elementor data for smart chunking'
         );
       }
       
       const elementorData = parsedResult.data;
+      const maxDepth = args.max_depth || 2;
+      const elementIndex = args.element_index || 0;
+      const includeWidgetPreviews = args.include_widget_previews || false;
       
-      const chunkSize = args.chunk_size || 5;
-      const chunkIndex = args.chunk_index || 0;
-      const totalElements = elementorData.length;
-      const totalChunks = Math.ceil(totalElements / chunkSize);
-      
-      const startIndex = chunkIndex * chunkSize;
-      const endIndex = Math.min(startIndex + chunkSize, totalElements);
-      
-      if (chunkIndex >= totalChunks) {
+      if (elementIndex >= elementorData.length) {
         return ResponseHelpers.createErrorResponse(
-          `Chunk index ${chunkIndex} is out of range. Total chunks: ${totalChunks}`,
-          'CHUNK_INDEX_OUT_OF_RANGE',
+          `Element index ${elementIndex} is out of range. Total top-level elements: ${elementorData.length}`,
+          'INDEX_OUT_OF_RANGE',
           'VALIDATION_ERROR',
-          `Requested chunk ${chunkIndex} but only ${totalChunks} chunks available`
+          'Requested element index exceeds available elements'
         );
       }
       
-      const chunk = elementorData.slice(startIndex, endIndex);
+      // Function to limit depth and content of elements
+      const limitElementDepth = (element: any, currentDepth: number): any => {
+        const limited: any = {
+          id: element.id,
+          elType: element.elType,
+          widgetType: element.widgetType || null,
+          isInner: element.isInner || false,
+          depth: currentDepth
+        };
+        
+        // Add limited settings (exclude heavy content)
+        if (element.settings) {
+          limited.settings = {};
+          
+          // Include only lightweight settings, exclude heavy content
+          const lightweightKeys = ['_column_size', '_inline_size', 'background_background', 'content_width', 'flex_direction', 'gap'];
+          lightweightKeys.forEach(key => {
+            if (element.settings[key] !== undefined) {
+              limited.settings[key] = element.settings[key];
+            }
+          });
+          
+          // Add widget content preview if requested and if it's a widget
+          if (includeWidgetPreviews && element.widgetType && element.settings) {
+            if (element.settings.title) {
+              limited.content_preview = String(element.settings.title).substring(0, 100);
+            } else if (element.settings.editor) {
+              limited.content_preview = String(element.settings.editor).replace(/<[^>]*>/g, '').substring(0, 100);
+            } else if (element.settings.html) {
+              limited.content_preview = String(element.settings.html).replace(/<[^>]*>/g, '').substring(0, 100);
+            }
+          }
+        }
+        
+        // Recursively process children up to max depth
+        if (element.elements && element.elements.length > 0 && currentDepth < maxDepth) {
+          limited.elements = element.elements.map((child: any) => limitElementDepth(child, currentDepth + 1));
+          limited.child_count = element.elements.length;
+        } else if (element.elements && element.elements.length > 0) {
+          // If we've reached max depth, just show summary
+          limited.child_count = element.elements.length;
+          limited.child_types = [...new Set(element.elements.map((child: any) => child.elType || child.widgetType))];
+        }
+        
+        return limited;
+      };
+      
+      const targetElement = elementorData[elementIndex];
+      const limitedElement = limitElementDepth(targetElement, 0);
+      
+      // Calculate approximate token size (rough estimate: 4 chars per token)
+      const estimatedTokens = Math.ceil(JSON.stringify(limitedElement).length / 4);
       
       return ResponseHelpers.createSuccessResponse(
         {
           post_id: args.post_id,
-          chunk_info: {
-            chunk_index: chunkIndex,
-            chunk_size: chunkSize,
-            total_chunks: totalChunks,
-            total_elements: totalElements,
-            elements_in_chunk: chunk.length,
-            start_index: startIndex,
-            end_index: endIndex - 1
+          element_index: elementIndex,
+          max_depth: maxDepth,
+          include_widget_previews: includeWidgetPreviews,
+          total_top_level_elements: elementorData.length,
+          element_data: limitedElement,
+          navigation: {
+            has_previous: elementIndex > 0,
+            has_next: elementIndex < elementorData.length - 1,
+            previous_index: elementIndex > 0 ? elementIndex - 1 : null,
+            next_index: elementIndex < elementorData.length - 1 ? elementIndex + 1 : null
           },
-          chunk_data: chunk,
-          pagination: {
-            has_next_chunk: chunkIndex < totalChunks - 1,
-            has_previous_chunk: chunkIndex > 0,
-            next_chunk_index: chunkIndex < totalChunks - 1 ? chunkIndex + 1 : null,
-            previous_chunk_index: chunkIndex > 0 ? chunkIndex - 1 : null
-          }
+          estimated_tokens: estimatedTokens
         },
-        `Retrieved chunk ${chunkIndex + 1} of ${totalChunks} (${chunk.length} elements) for post ID ${args.post_id}`
+        `Retrieved smart element ${elementIndex + 1} of ${elementorData.length} with max depth ${maxDepth} (estimated ${estimatedTokens} tokens)`
       );
     } catch (error: any) {
       return ResponseHelpers.createErrorResponse(
-        `Failed to get chunked Elementor data: ${error.response?.data?.message || error.message}`,
-        'GET_CHUNKED_DATA_ERROR',
+        `Failed to get smart Elementor data: ${error.message}`,
+        'GET_SMART_DATA_ERROR',
         'API_ERROR',
-        `HTTP ${error.response?.status}: ${error.response?.statusText}`
+        'Operation failed'
+      );
+    }
+  }
+
+  private async getElementorStructureSummary(args: { post_id: number; max_depth?: number }): Promise<any> {
+    const authCheck = this.wordPressClient.ensureAuthenticated();
+    if (authCheck) return authCheck;
+    
+    try {
+      console.error(`📊 Getting structure summary for ID: ${args.post_id}`);
+      
+      const parsedResult = await this.elementorHandler.safeGetElementorData(args.post_id);
+      
+      if (!parsedResult.success || !parsedResult.data) {
+        return ResponseHelpers.createErrorResponse(
+          `Failed to get Elementor data for post/page ID ${args.post_id}: ${parsedResult.error || 'Unknown error'}`,
+          'ELEMENTOR_DATA_ERROR',
+          'DATA_ERROR',
+          'Could not retrieve or parse Elementor data for structure summary'
+        );
+      }
+      
+      const elementorData = parsedResult.data;
+      const maxDepth = args.max_depth || 4;
+      
+      // Function to create structure summary
+      const createStructureSummary = (elements: any[], currentDepth: number = 0): any[] => {
+        return elements.map(element => {
+          const summary: any = {
+            id: element.id,
+            type: element.elType,
+            depth: currentDepth
+          };
+          
+          if (element.widgetType) {
+            summary.widget_type = element.widgetType;
+          }
+          
+          if (element.settings) {
+            // Add basic layout info
+            if (element.settings._column_size) {
+              summary.column_size = element.settings._column_size;
+            }
+            if (element.settings.content_width) {
+              summary.content_width = element.settings.content_width;
+            }
+          }
+          
+          if (element.elements && element.elements.length > 0) {
+            summary.child_count = element.elements.length;
+            if (currentDepth < maxDepth) {
+              summary.children = createStructureSummary(element.elements, currentDepth + 1);
+            } else {
+              summary.child_types = [...new Set(element.elements.map((child: any) => child.elType || child.widgetType))];
+            }
+          }
+          
+          return summary;
+        });
+      };
+      
+      const structureSummary = createStructureSummary(elementorData);
+      
+      return ResponseHelpers.createSuccessResponse(
+        {
+          post_id: args.post_id,
+          max_depth: maxDepth,
+          total_top_level_elements: elementorData.length,
+          structure: structureSummary
+        },
+        `Retrieved structure summary for post ID ${args.post_id} with ${elementorData.length} top-level elements`
+      );
+    } catch (error: any) {
+      return ResponseHelpers.createErrorResponse(
+        `Failed to get structure summary: ${error.message}`,
+        'GET_STRUCTURE_SUMMARY_ERROR',
+        'API_ERROR',
+        'Operation failed'
       );
     }
   }

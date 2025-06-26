@@ -10,9 +10,31 @@ export class ElementorDataHandler {
   async safeGetElementorData(postId: number): Promise<ParsedElementorData> {
     try {
       const response = await this.getElementorData({ post_id: postId });
-      const responseText = response.content[0].text;
       
-      return ElementorDataParser.parseElementorResponse(responseText);
+      // Parse the JSON response from content[0].text
+      const responseText = response.content[0].text;
+      const parsedResponse = JSON.parse(responseText);
+      
+      // Check if response indicates success and has data
+      if (parsedResponse.status === 'success' && parsedResponse.data?.elementor_data) {
+        return {
+          success: true,
+          data: parsedResponse.data.elementor_data,
+          debugInfo: `Successfully retrieved ${parsedResponse.data.elementor_data.length} elements for post ${postId}`
+        };
+      } else if (parsedResponse.status === 'error') {
+        return {
+          success: false,
+          error: parsedResponse.data?.message || parsedResponse.message || 'Unknown error from getElementorData',
+          debugInfo: parsedResponse.data?.details || parsedResponse.details || ''
+        };
+      } else {
+        return {
+          success: false,
+          error: 'Unexpected response format from getElementorData',
+          debugInfo: `Response status: ${parsedResponse.status}`
+        };
+      }
     } catch (error: any) {
       return {
         success: false,
