@@ -56,7 +56,7 @@ class ElementorWordPressMCP {
     this.server = new Server(
       {
         name: 'elementor-wordpress-mcp',
-        version: '1.6.8',
+        version: '1.7.1',
       }
     );
 
@@ -190,9 +190,31 @@ class ElementorWordPressMCP {
   private async safeGetElementorData(postId: number): Promise<ParsedElementorData> {
     try {
       const response = await this.getElementorData({ post_id: postId });
-      const responseText = response.content[0].text;
       
-      return this.parseElementorResponse(responseText);
+      // Parse the JSON response from content[0].text
+      const responseText = response.content[0].text;
+      const parsedResponse = JSON.parse(responseText);
+      
+      // Check if response indicates success and has data
+      if (parsedResponse.status === 'success' && parsedResponse.data?.elementor_data) {
+        return {
+          success: true,
+          data: parsedResponse.data.elementor_data,
+          debugInfo: `Successfully retrieved ${parsedResponse.data.elementor_data.length} elements for post ${postId}`
+        };
+      } else if (parsedResponse.status === 'error') {
+        return {
+          success: false,
+          error: parsedResponse.data?.message || parsedResponse.message || 'Unknown error from getElementorData',
+          debugInfo: parsedResponse.data?.details || parsedResponse.details || ''
+        };
+      } else {
+        return {
+          success: false,
+          error: 'Unexpected response format from getElementorData',
+          debugInfo: `Response status: ${parsedResponse.status}`
+        };
+      }
     } catch (error: any) {
       return {
         success: false,
@@ -375,6 +397,12 @@ class ElementorWordPressMCP {
   }
 
   private setupToolHandlers() {
+    // Tool Consolidation (v1.6.9):
+    // - Removed: get_elementor_data_chunked (replaced by get_elementor_data_smart)
+    // - Removed: get_page_structure (redundant with get_elementor_structure_summary)  
+    // - Removed: clear_elementor_cache_by_page (redundant with clear_elementor_cache)
+    // - Renamed: get_elementor_data_deep_chunked → get_elementor_data_smart
+    
     this.server.setRequestHandler(ListToolsRequestSchema, async () => {
       const tools: any[] = [];
       
@@ -492,6 +520,20 @@ class ElementorWordPressMCP {
                   default: 'publish',
                 },
               },
+            },
+          },
+          {
+            name: 'get_page',
+            description: 'Get a specific WordPress page by ID',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                id: {
+                  type: 'number',
+                  description: 'Page ID',
+                },
+              },
+              required: ['id'],
             },
           },
           {
@@ -777,8 +819,8 @@ class ElementorWordPressMCP {
             },
           },
           {
-            name: 'get_elementor_data_chunked',
-            description: 'Get Elementor data in smaller chunks to handle large pages more efficiently',
+            name: 'get_elementor_data_smart',
+            description: 'Get Elementor data with intelligent chunking for large pages - automatically handles nested structures and token limits',
             inputSchema: {
               type: 'object',
               properties: {
@@ -786,15 +828,39 @@ class ElementorWordPressMCP {
                   type: 'number',
                   description: 'Post/Page ID',
                 },
-                chunk_size: {
+                max_depth: {
                   type: 'number',
-                  description: 'Number of top-level elements per chunk (default: 5)',
-                  default: 5,
+                  description: 'Maximum nesting depth to include (default: 2 - sections and columns only)',
+                  default: 2,
                 },
-                chunk_index: {
+                element_index: {
                   type: 'number',
-                  description: 'Zero-based chunk index to retrieve (default: 0)',
+                  description: 'Zero-based index of top-level element to retrieve (default: 0)',
                   default: 0,
+                },
+                include_widget_previews: {
+                  type: 'boolean',
+                  description: 'Include widget content previews (default: false)',
+                  default: false,
+                },
+              },
+              required: ['post_id'],
+            },
+          },
+          {
+            name: 'get_elementor_structure_summary',
+            description: 'Get a compact summary of the page structure without heavy content to understand layout quickly',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                post_id: {
+                  type: 'number',
+                  description: 'Post/Page ID',
+                },
+                max_depth: {
+                  type: 'number',
+                  description: 'Maximum depth to analyze (default: 4)',
+                  default: 4,
                 },
               },
               required: ['post_id'],
@@ -1137,48 +1203,9 @@ class ElementorWordPressMCP {
         );
       }
 
-      if (this.serverConfig.pageStructure) {
-        tools.push(
-          {
-            name: 'get_page_structure',
-            description: 'Get a simplified overview of the page structure',
-            inputSchema: {
-              type: 'object',
-              properties: {
-                post_id: {
-                  type: 'number',
-                  description: 'Post/Page ID',
-                },
-                include_settings: {
-                  type: 'boolean',
-                  description: 'Include basic settings for each element (default: false)',
-                  default: false,
-                },
-              },
-              required: ['post_id'],
-            },
-          }
-        );
-      }
 
-      if (this.serverConfig.performanceOptimization) {
-        tools.push(
-          {
-            name: 'clear_elementor_cache_by_page',
-            description: 'Clear Elementor cache for a specific page',
-            inputSchema: {
-              type: 'object',
-              properties: {
-                post_id: {
-                  type: 'number',
-                  description: 'Post/Page ID to clear cache for',
-                },
-              },
-              required: ['post_id'],
-            },
-          }
-        );
-      }
+
+
 
       if (this.serverConfig.advancedElementOperations) {
         tools.push(
@@ -1237,6 +1264,8 @@ class ElementorWordPressMCP {
             return await this.updatePost(args as any);
           case 'get_pages':
             return await this.getPages(args as any);
+          case 'get_page':
+            return await this.getPage(args as any);
           case 'list_all_content':
             return await this.listAllContent(args as any);
           case 'create_page':
@@ -1257,8 +1286,10 @@ class ElementorWordPressMCP {
             return await this.getElementorElements(args as any);
           case 'update_elementor_section':
             return await this.updateElementorSection(args as any);
-          case 'get_elementor_data_chunked':
-            return await this.getElementorDataChunked(args as any);
+          case 'get_elementor_data_smart':
+            return await this.getElementorDataDeepChunked(args as any);
+          case 'get_elementor_structure_summary':
+            return await this.getElementorStructureSummary(args as any);
           case 'backup_elementor_data':
             return await this.backupElementorData(args as any);
           case 'get_media':
@@ -1309,8 +1340,6 @@ class ElementorWordPressMCP {
           case 'update_elementor_global_fonts':
             return await this.updateElementorGlobalFonts(args as any);
           // Page Structure Tools
-          case 'get_page_structure':
-            return await this.getPageStructure(args as any);
           case 'rebuild_page_structure':
             return await this.rebuildPageStructure(args as any);
           case 'validate_elementor_data':
@@ -1322,8 +1351,7 @@ class ElementorWordPressMCP {
             return await this.optimizeElementorAssets(args as any);
           case 'clear_elementor_cache':
             return await this.clearElementorCacheGeneral(args as any);
-          case 'clear_elementor_cache_by_page':
-            return await this.clearElementorCacheByPage(args as any);
+
           // Advanced Element Operations
           case 'find_elements_by_type':
             return await this.findElementsByType(args as any);
@@ -1378,7 +1406,7 @@ class ElementorWordPressMCP {
         },
         serverInfo: {
           name: 'elementor-wordpress-mcp',
-          version: '1.6.8',
+          version: '1.7.1',
         },
       };
     });
@@ -1426,7 +1454,7 @@ class ElementorWordPressMCP {
       return this.createErrorResponse(
 
 
-        "Unknown resource: ${uri}",
+                  `Unknown resource: ${uri}`,
 
 
         "OPERATION_ERROR",
@@ -1450,7 +1478,7 @@ class ElementorWordPressMCP {
     const params: any = {
       per_page: args.per_page || 10,
       status: args.status || 'publish',
-      context: 'edit' // Get full data including meta
+      context: 'view' // Use 'view' instead of 'edit' for lighter responses
     };
     
     if (args.search) {
@@ -1461,30 +1489,44 @@ class ElementorWordPressMCP {
       console.error(`Fetching posts with params: ${JSON.stringify(params)}`);
       const response = await this.axiosInstance!.get('posts', { params });
       
-      // Enhanced response with debugging info
+      // Create optimized summary objects instead of returning full content
       const posts = response.data;
+      const postSummaries = posts.map((post: any) => ({
+        id: post.id,
+        title: post.title?.rendered || '(No title)',
+        status: post.status,
+        date_created: post.date,
+        date_modified: post.modified,
+        url: post.link,
+        excerpt: post.excerpt?.rendered ? post.excerpt.rendered.replace(/<[^>]*>/g, '').substring(0, 100) + '...' : '',
+        author: post.author,
+        featured_media: post.featured_media,
+        comment_count: post.comment_count || 0,
+        // Include Elementor status for quick reference
+        elementor_status: post.meta?._elementor_data ? 'full' : 
+                         post.meta?._elementor_edit_mode === 'builder' ? 'partial' : 'none'
+      }));
+      
       let debugInfo = `Found ${posts.length} posts\n`;
       
-      // Add summary of posts with Elementor data detection
-      posts.forEach((post: any, index: number) => {
-        const hasElementorData = post.meta && post.meta._elementor_data;
-        const hasElementorEditMode = post.meta && post.meta._elementor_edit_mode;
-        debugInfo += `${index + 1}. ID: ${post.id}, Title: "${post.title.rendered}", Status: ${post.status}`;
-        if (hasElementorData) {
-          debugInfo += ` ✅ Elementor`;
-        } else if (hasElementorEditMode) {
-          debugInfo += ` ⚠️ Elementor (no data)`;
-        }
-        debugInfo += `\n`;
-      });
+             // Add summary with Elementor status counts
+       const elementorStats = {
+         full: postSummaries.filter((p: any) => p.elementor_status === 'full').length,
+         partial: postSummaries.filter((p: any) => p.elementor_status === 'partial').length,
+         none: postSummaries.filter((p: any) => p.elementor_status === 'none').length
+       };
+      
+      debugInfo += `Elementor Status: ✅ Full (${elementorStats.full}), ⚠️ Partial (${elementorStats.partial}), ❌ None (${elementorStats.none})\n`;
+      debugInfo += `\n💡 Use get_post tool with specific ID for full content details\n`;
       
       return this.createSuccessResponse(
         {
-          posts: posts,
+          posts: postSummaries, // Return summaries instead of full objects
           summary: debugInfo,
-          total_found: posts.length
+          total_found: posts.length,
+          performance_note: "Optimized response - use get_post(id) for full content details"
         },
-        `Successfully retrieved ${posts.length} posts`
+        `Successfully retrieved ${posts.length} post summaries`
       );
     } catch (error: any) {
       console.error(`Error fetching posts: ${error.response?.status} - ${error.response?.statusText}`);
@@ -1531,6 +1573,43 @@ class ElementorWordPressMCP {
       return this.createErrorResponse(
         `Failed to fetch post ${args.id}: ${error.response?.status} ${error.response?.statusText} - ${error.response?.data?.message || error.message}`,
         'FETCH_POST_ERROR',
+        'API_ERROR',
+        `HTTP ${error.response?.status}: ${error.response?.statusText}`
+      );
+    }
+  }
+
+  private async getPage(args: { id: number }) {
+    const authCheck = this.ensureAuthenticated();
+    if (authCheck) return authCheck;
+    
+    try {
+      console.error(`Fetching page with ID: ${args.id}`);
+      const response = await this.axiosInstance!.get(`pages/${args.id}`, {
+        params: { context: 'edit' }
+      });
+      
+      return this.createSuccessResponse(
+        response.data,
+        `Successfully retrieved page ${args.id}`
+      );
+    } catch (error: any) {
+      console.error(`Error fetching page ${args.id}: ${error.response?.status} - ${error.response?.statusText}`);
+      console.error(`URL: ${error.config?.url}`);
+      console.error(`Headers: ${JSON.stringify(error.config?.headers)}`);
+      
+      if (error.response?.status === 404) {
+        return this.createErrorResponse(
+          `Page with ID ${args.id} not found. The page may have been deleted, be in trash, or may not exist.`,
+          'PAGE_NOT_FOUND',
+          'NOT_FOUND_ERROR',
+          `HTTP 404: Page ${args.id} does not exist`
+        );
+      }
+      
+      return this.createErrorResponse(
+        `Failed to fetch page ${args.id}: ${error.response?.status} ${error.response?.statusText} - ${error.response?.data?.message || error.message}`,
+        'FETCH_PAGE_ERROR',
         'API_ERROR',
         `HTTP ${error.response?.status}: ${error.response?.statusText}`
       );
@@ -1641,37 +1720,53 @@ class ElementorWordPressMCP {
     const params = {
       per_page: args.per_page || 10,
       status: args.status || 'publish',
-      context: 'edit' // Get full data including meta
+      context: 'view' // Use 'view' instead of 'edit' for lighter responses
     };
 
     try {
       console.error(`Fetching pages with params: ${JSON.stringify(params)}`);
       const response = await this.axiosInstance!.get('pages', { params });
       
-      // Enhanced response with debugging info
+      // Create optimized summary objects instead of returning full content
       const pages = response.data;
+      const pageSummaries = pages.map((page: any) => ({
+        id: page.id,
+        title: page.title?.rendered || '(No title)',
+        status: page.status,
+        date_created: page.date,
+        date_modified: page.modified,
+        url: page.link,
+        excerpt: page.excerpt?.rendered ? page.excerpt.rendered.replace(/<[^>]*>/g, '').substring(0, 100) + '...' : '',
+        author: page.author,
+        parent: page.parent,
+        menu_order: page.menu_order,
+        featured_media: page.featured_media,
+        comment_count: page.comment_count || 0,
+        // Include Elementor status for quick reference
+        elementor_status: page.meta?._elementor_data ? 'full' : 
+                         page.meta?._elementor_edit_mode === 'builder' ? 'partial' : 'none'
+      }));
+      
       let debugInfo = `Found ${pages.length} pages\n`;
       
-      // Add summary of pages with Elementor data detection
-      pages.forEach((page: any, index: number) => {
-        const hasElementorData = page.meta && page.meta._elementor_data;
-        const hasElementorEditMode = page.meta && page.meta._elementor_edit_mode;
-        debugInfo += `${index + 1}. ID: ${page.id}, Title: "${page.title.rendered}", Status: ${page.status}`;
-        if (hasElementorData) {
-          debugInfo += ` ✅ Elementor`;
-        } else if (hasElementorEditMode) {
-          debugInfo += ` ⚠️ Elementor (no data)`;
-        }
-        debugInfo += `\n`;
-      });
+             // Add summary with Elementor status counts
+       const elementorStats = {
+         full: pageSummaries.filter((p: any) => p.elementor_status === 'full').length,
+         partial: pageSummaries.filter((p: any) => p.elementor_status === 'partial').length,
+         none: pageSummaries.filter((p: any) => p.elementor_status === 'none').length
+       };
+      
+      debugInfo += `Elementor Status: ✅ Full (${elementorStats.full}), ⚠️ Partial (${elementorStats.partial}), ❌ None (${elementorStats.none})\n`;
+      debugInfo += `\n💡 Use get_page tool with specific ID for full content details\n`;
       
       return this.createSuccessResponse(
         {
-          pages: pages,
+          pages: pageSummaries, // Return summaries instead of full objects
           summary: debugInfo,
-          total_found: pages.length
+          total_found: pages.length,
+          performance_note: "Optimized response - use get_page(id) for full content details"
         },
-        `Successfully retrieved ${pages.length} pages`
+        `Successfully retrieved ${pages.length} page summaries`
       );
     } catch (error: any) {
       console.error(`Error fetching pages: ${error.response?.status} - ${error.response?.statusText}`);
@@ -1954,12 +2049,31 @@ class ElementorWordPressMCP {
 
     try {
       const response = await this.axiosInstance!.get('elementor_library', { params });
+      
+      // Create optimized summary objects instead of returning full content
+      const templates = response.data;
+      const templateSummaries = templates.map((template: any) => ({
+        id: template.id,
+        title: template.title?.rendered || '(No title)',
+        template_type: template.meta?._elementor_template_type || 'unknown',
+        date_created: template.date,
+        date_modified: template.modified,
+        status: template.status,
+        author: template.author,
+        // Basic template info without heavy Elementor data
+        has_elementor_data: !!template.meta?._elementor_data,
+        element_count: template.meta?._elementor_data ? 
+          (JSON.parse(template.meta._elementor_data)?.length || 0) : 0
+      }));
+      
       return this.createSuccessResponse(
         {
-          templates: response.data,
-          count: response.data.length
+          templates: templateSummaries, // Return summaries instead of full objects
+          count: templateSummaries.length,
+          filter_type: args.type || 'all',
+          performance_note: "Optimized response - use get_elementor_data(template_id) for full template content"
         },
-        `Retrieved ${response.data.length} Elementor templates`
+        `Retrieved ${templateSummaries.length} Elementor template summaries`
       );
     } catch (error: any) {
       if (error.response?.status === 404) {
@@ -2719,7 +2833,7 @@ Suggestions:
       if (!sectionFound) {
         return this.createErrorResponse(
 
-          "Section ID ${args.section_id} not found in Elementor data",
+          `Section ID ${args.section_id} not found in Elementor data`,
 
           "OPERATION_ERROR",
 
@@ -2752,15 +2866,10 @@ Suggestions:
             postType = 'page';
           } catch (pageError: any) {
             return this.createErrorResponse(
-
-              "Post/Page ID ${args.post_id} not found in posts or pages",
-
+              `Post/Page ID ${args.post_id} not found in posts or pages`,
               "OPERATION_ERROR",
-
               "API_ERROR",
-
               "Operation failed"
-
             );
           }
         } else {
@@ -2791,102 +2900,254 @@ Suggestions:
         throw error;
       }
       return this.createErrorResponse(
-
-        "Failed to update Elementor section: ${error.response?.data?.message || error.message}",
-
+        `Failed to update Elementor section: ${error.response?.data?.message || error.message}`,
         "OPERATION_ERROR",
-
         "API_ERROR",
-
         "Operation failed"
-
       );
     }
   }
 
-  private async getElementorDataChunked(args: { post_id: number; chunk_size?: number; chunk_index?: number }) {
-    this.ensureAuthenticated();
+
+
+  private async getElementorDataDeepChunked(args: { post_id: number; max_depth?: number; element_index?: number; include_widget_previews?: boolean }) {
+    const authCheck = this.ensureAuthenticated();
+    if (authCheck) return authCheck;
     
     try {
-      // Get current Elementor data using safe parsing utility  
+      console.error(`🔍 Getting deep chunked Elementor data for ID: ${args.post_id}, element index: ${args.element_index || 0}`);
+      
+      // Get current Elementor data using safe parsing utility
       const parsedResult = await this.safeGetElementorData(args.post_id);
       
       if (!parsedResult.success || !parsedResult.data) {
         return this.createErrorResponse(
-
-          "Failed to get Elementor data for post/page ID ${args.post_id}: ${parsedResult.error || 'Unknown error'}",
-
-          "OPERATION_ERROR",
-
-          "API_ERROR",
-
-          "Operation failed"
-
+          `Failed to get Elementor data for post/page ID ${args.post_id}: ${parsedResult.error || 'Unknown error'}`,
+          'ELEMENTOR_DATA_ERROR',
+          'DATA_ERROR',
+          'Could not retrieve or parse Elementor data for deep chunking'
         );
       }
       
       const elementorData = parsedResult.data;
+      const maxDepth = args.max_depth || 2;
+      const elementIndex = args.element_index || 0;
+      const includeWidgetPreviews = args.include_widget_previews || false;
       
-      const chunkSize = args.chunk_size || 5;
-      const chunkIndex = args.chunk_index || 0;
-      const totalElements = elementorData.length;
-      const totalChunks = Math.ceil(totalElements / chunkSize);
-      
-      const startIndex = chunkIndex * chunkSize;
-      const endIndex = Math.min(startIndex + chunkSize, totalElements);
-      
-      if (chunkIndex >= totalChunks) {
+      if (elementIndex >= elementorData.length) {
         return this.createErrorResponse(
-
-          "Chunk index ${chunkIndex} is out of range. Total chunks: ${totalChunks}",
-
-          "OPERATION_ERROR",
-
-          "API_ERROR",
-
-          "Operation failed"
-
+          `Element index ${elementIndex} is out of range. Total top-level elements: ${elementorData.length}`,
+          'INDEX_OUT_OF_RANGE',
+          'VALIDATION_ERROR',
+          'Requested element index exceeds available elements'
         );
       }
       
-      const chunk = elementorData.slice(startIndex, endIndex);
+      // Function to limit depth and content of elements
+      const limitElementDepth = (element: any, currentDepth: number): any => {
+        const limited: any = {
+          id: element.id,
+          elType: element.elType,
+          widgetType: element.widgetType || null,
+          isInner: element.isInner || false,
+          depth: currentDepth
+        };
+        
+        // Add limited settings (exclude heavy content)
+        if (element.settings) {
+          limited.settings = {};
+          
+          // Include only lightweight settings, exclude heavy content
+          const lightweightKeys = ['_column_size', '_inline_size', 'background_background', 'content_width', 'flex_direction', 'gap'];
+          lightweightKeys.forEach(key => {
+            if (element.settings[key] !== undefined) {
+              limited.settings[key] = element.settings[key];
+            }
+          });
+          
+          // Add widget content preview if requested and if it's a widget
+          if (includeWidgetPreviews && element.widgetType && element.settings) {
+            if (element.settings.title) {
+              limited.content_preview = String(element.settings.title).substring(0, 100);
+            } else if (element.settings.editor) {
+              limited.content_preview = String(element.settings.editor).replace(/<[^>]*>/g, '').substring(0, 100);
+            } else if (element.settings.html) {
+              limited.content_preview = String(element.settings.html).replace(/<[^>]*>/g, '').substring(0, 100);
+            }
+          }
+        }
+        
+        // Recursively process children up to max depth
+        if (element.elements && element.elements.length > 0 && currentDepth < maxDepth) {
+          limited.elements = element.elements.map((child: any) => limitElementDepth(child, currentDepth + 1));
+          limited.child_count = element.elements.length;
+        } else if (element.elements && element.elements.length > 0) {
+          // If we've reached max depth, just show summary
+          limited.child_count = element.elements.length;
+          limited.child_types = [...new Set(element.elements.map((child: any) => child.elType || child.widgetType))];
+        }
+        
+        return limited;
+      };
+      
+      const targetElement = elementorData[elementIndex];
+      const limitedElement = limitElementDepth(targetElement, 0);
+      
+      // Calculate approximate token size (rough estimate: 4 chars per token)
+      const estimatedTokens = Math.ceil(JSON.stringify(limitedElement).length / 4);
       
       return this.createSuccessResponse(
         {
           post_id: args.post_id,
-          chunk_info: {
-            chunk_index: chunkIndex,
-            chunk_size: chunkSize,
-            total_chunks: totalChunks,
-            total_elements: totalElements,
-            elements_in_chunk: chunk.length,
-            start_index: startIndex,
-            end_index: endIndex - 1
+          element_index: elementIndex,
+          max_depth: maxDepth,
+          include_widget_previews: includeWidgetPreviews,
+          total_top_level_elements: elementorData.length,
+          element_data: limitedElement,
+          navigation: {
+            has_previous: elementIndex > 0,
+            has_next: elementIndex < elementorData.length - 1,
+            previous_index: elementIndex > 0 ? elementIndex - 1 : null,
+            next_index: elementIndex < elementorData.length - 1 ? elementIndex + 1 : null
           },
-          chunk_data: chunk,
-          pagination: {
-            has_next_chunk: chunkIndex < totalChunks - 1,
-            has_previous_chunk: chunkIndex > 0,
-            next_chunk_index: chunkIndex < totalChunks - 1 ? chunkIndex + 1 : null,
-            previous_chunk_index: chunkIndex > 0 ? chunkIndex - 1 : null
-          }
+          estimated_tokens: estimatedTokens
         },
-        `Retrieved chunk ${chunkIndex + 1} of ${totalChunks} (${chunk.length} elements) for post ID ${args.post_id}`
+        `Retrieved deep chunked element ${elementIndex + 1} of ${elementorData.length} with max depth ${maxDepth} (estimated ${estimatedTokens} tokens)`
       );
     } catch (error: any) {
-      if (error instanceof McpError) {
-        throw error;
-      }
       return this.createErrorResponse(
+        `Failed to get deep chunked Elementor data: ${error.message}`,
+        'GET_DEEP_CHUNKED_DATA_ERROR',
+        'API_ERROR',
+        'Operation failed'
+      );
+    }
+  }
 
-        "Failed to get chunked Elementor data: ${error.response?.data?.message || error.message}",
-
-        "OPERATION_ERROR",
-
-        "API_ERROR",
-
-        "Operation failed"
-
+  private async getElementorStructureSummary(args: { post_id: number; max_depth?: number }) {
+    const authCheck = this.ensureAuthenticated();
+    if (authCheck) return authCheck;
+    
+    try {
+      console.error(`📊 Getting structure summary for ID: ${args.post_id}`);
+      
+      // Get current Elementor data using safe parsing utility
+      const parsedResult = await this.safeGetElementorData(args.post_id);
+      
+      if (!parsedResult.success || !parsedResult.data) {
+        return this.createErrorResponse(
+          `Failed to get Elementor data for post/page ID ${args.post_id}: ${parsedResult.error || 'Unknown error'}`,
+          'ELEMENTOR_DATA_ERROR',
+          'DATA_ERROR',
+          'Could not retrieve or parse Elementor data for structure summary'
+        );
+      }
+      
+      const elementorData = parsedResult.data;
+      const maxDepth = args.max_depth || 4;
+      
+      // Function to create a minimal structure summary
+      const createStructureSummary = (elements: any[], currentDepth: number = 0): any[] => {
+        return elements.map((element, index) => {
+          const summary: any = {
+            index: index,
+            id: element.id,
+            type: element.elType,
+            depth: currentDepth
+          };
+          
+          if (element.widgetType) {
+            summary.widget_type = element.widgetType;
+          }
+          
+          // Add some key properties for structure understanding
+          if (element.settings) {
+            if (element.settings._column_size) {
+              summary.column_size = element.settings._column_size;
+            }
+            if (element.settings.content_width) {
+              summary.content_width = element.settings.content_width;
+            }
+            if (element.settings.flex_direction) {
+              summary.flex_direction = element.settings.flex_direction;
+            }
+          }
+          
+          // Count children and their types
+          if (element.elements && element.elements.length > 0) {
+            summary.child_count = element.elements.length;
+            summary.child_types = [...new Set(element.elements.map((child: any) => child.elType || child.widgetType))];
+            
+            // Recursively process children up to max depth
+            if (currentDepth < maxDepth) {
+              summary.children = createStructureSummary(element.elements, currentDepth + 1);
+            }
+          }
+          
+          return summary;
+        });
+      };
+      
+      const structureSummary = createStructureSummary(elementorData);
+      
+      // Calculate total elements at each level
+      const levelCounts: { [key: number]: number } = {};
+      const widgetCounts: { [key: string]: number } = {};
+      
+      const countElements = (elements: any[], depth: number = 0) => {
+        levelCounts[depth] = (levelCounts[depth] || 0) + elements.length;
+        
+        elements.forEach(element => {
+          if (element.widget_type) {
+            widgetCounts[element.widget_type] = (widgetCounts[element.widget_type] || 0) + 1;
+          }
+          
+          if (element.children) {
+            countElements(element.children, depth + 1);
+          }
+        });
+      };
+      
+      countElements(structureSummary);
+      
+      // Create human-readable summary
+      let textSummary = `📄 Page Structure Summary (Post ID: ${args.post_id})\n\n`;
+      textSummary += `🏗️ Top-level elements: ${elementorData.length}\n`;
+      
+      Object.entries(levelCounts).forEach(([depth, count]) => {
+        textSummary += `   Level ${depth}: ${count} elements\n`;
+      });
+      
+      if (Object.keys(widgetCounts).length > 0) {
+        textSummary += `\n🧩 Widget types found:\n`;
+        Object.entries(widgetCounts)
+          .sort(([,a], [,b]) => b - a)
+          .forEach(([widget, count]) => {
+            textSummary += `   ${widget}: ${count}\n`;
+          });
+      }
+      
+      return this.createSuccessResponse(
+        {
+          post_id: args.post_id,
+          max_depth: maxDepth,
+          structure: structureSummary,
+          statistics: {
+            total_top_level_elements: elementorData.length,
+            level_counts: levelCounts,
+            widget_counts: widgetCounts,
+            total_widgets: Object.values(widgetCounts).reduce((sum, count) => sum + count, 0)
+          },
+          text_summary: textSummary
+        },
+        `Structure summary generated for ${elementorData.length} top-level elements with ${Object.values(levelCounts).reduce((sum, count) => sum + count, 0)} total elements`
+      );
+    } catch (error: any) {
+      return this.createErrorResponse(
+        `Failed to get structure summary: ${error.message}`,
+        'GET_STRUCTURE_SUMMARY_ERROR',
+        'API_ERROR',
+        'Operation failed'
       );
     }
   }
@@ -2900,15 +3161,10 @@ Suggestions:
       
       if (!parsedResult.success || !parsedResult.data) {
         return this.createErrorResponse(
-
-          "Failed to get Elementor data for post/page ID ${args.post_id}: ${parsedResult.error || 'Unknown error'}",
-
+          `Failed to get Elementor data for post/page ID ${args.post_id}: ${parsedResult.error || 'Unknown error'}`,
           "OPERATION_ERROR",
-
           "API_ERROR",
-
           "Operation failed"
-
         );
       }
       
@@ -2934,7 +3190,7 @@ Suggestions:
           } catch (pageError: any) {
             return this.createErrorResponse(
 
-              "Post/Page ID ${args.post_id} not found in posts or pages",
+              `Post/Page ID ${args.post_id} not found in posts or pages`,
 
               "OPERATION_ERROR",
 
@@ -2991,15 +3247,10 @@ Suggestions:
         throw error;
       }
       return this.createErrorResponse(
-
-        "Failed to backup Elementor data: ${error.response?.data?.message || error.message}",
-
+        `Failed to backup Elementor data: ${error.response?.data?.message || error.message}`,
         "OPERATION_ERROR",
-
         "API_ERROR",
-
         "Operation failed"
-
       );
     }
   }
@@ -3020,13 +3271,31 @@ Suggestions:
       console.error(`Fetching media with params: ${JSON.stringify(params)}`);
       const response = await this.axiosInstance!.get('media', { params });
       
+      // Create optimized summary objects instead of returning full content
+      const media = response.data;
+      const mediaSummaries = media.map((item: any) => ({
+        id: item.id,
+        title: item.title?.rendered || '(No title)',
+        filename: item.media_details?.file || 'Unknown',
+        mime_type: item.mime_type,
+        file_size: item.media_details?.filesize || 0,
+        width: item.media_details?.width || null,
+        height: item.media_details?.height || null,
+        url: item.source_url,
+        date_uploaded: item.date,
+        alt_text: item.alt_text || '',
+        author: item.author,
+        status: item.status
+      }));
+      
       return this.createSuccessResponse(
         {
-          media: response.data,
-          count: response.data.length,
-          filter: args.media_type || 'all'
+          media: mediaSummaries, // Return summaries instead of full objects
+          count: mediaSummaries.length,
+          filter: args.media_type || 'all',
+          performance_note: "Optimized response - use get_media_item(id) for full details"
         },
-        `Retrieved ${response.data.length} media items`
+        `Retrieved ${mediaSummaries.length} media item summaries`
       );
     } catch (error: any) {
       console.error(`Error fetching media: ${error.response?.status} - ${error.response?.statusText}`);
@@ -3213,7 +3482,7 @@ Suggestions:
       }
       return this.createErrorResponse(
 
-        "Failed to create section: ${error.message}",
+        `Failed to create section: ${error.message}`,
 
         "OPERATION_ERROR",
 
@@ -3287,7 +3556,7 @@ Suggestions:
       }
       return this.createErrorResponse(
 
-        "Failed to create container: ${error.message}",
+        `Failed to create container: ${error.message}`,
 
         "OPERATION_ERROR",
 
@@ -3309,7 +3578,7 @@ Suggestions:
       if (!parsedResult.success || !parsedResult.data) {
         return this.createErrorResponse(
 
-          "Failed to get Elementor data for post/page ID ${args.post_id}: ${parsedResult.error || 'Unknown error'}",
+          `Failed to get Elementor data for post/page ID ${args.post_id}: ${parsedResult.error || 'Unknown error'}`,
 
           "OPERATION_ERROR",
 
@@ -3357,15 +3626,10 @@ Suggestions:
       
       if (!sectionFound) {
         return this.createErrorResponse(
-
-          "Section ID ${args.section_id} not found",
-
+          `Section ID ${args.section_id} not found`,
           "OPERATION_ERROR",
-
           "API_ERROR",
-
           "Operation failed"
-
         );
       }
       
@@ -3390,15 +3654,10 @@ Suggestions:
         throw error;
       }
       return this.createErrorResponse(
-
-        "Failed to add columns to section: ${error.message}",
-
+        `Failed to add columns to section: ${error.message}`,
         "OPERATION_ERROR",
-
         "API_ERROR",
-
         "Operation failed"
-
       );
     }
   }
@@ -3412,15 +3671,10 @@ Suggestions:
       
       if (!parsedResult.success || !parsedResult.data) {
         return this.createErrorResponse(
-
-          "Failed to get Elementor data for post/page ID ${args.post_id}: ${parsedResult.error || 'Unknown error'}",
-
+          `Failed to get Elementor data for post/page ID ${args.post_id}: ${parsedResult.error || 'Unknown error'}`,
           "OPERATION_ERROR",
-
           "API_ERROR",
-
           "Operation failed"
-
         );
       }
       
@@ -3440,15 +3694,10 @@ Suggestions:
       
       if (!sectionToDuplicate) {
         return this.createErrorResponse(
-
-          "Section ID ${args.section_id} not found",
-
+          `Section ID ${args.section_id} not found`,
           "OPERATION_ERROR",
-
           "API_ERROR",
-
           "Operation failed"
-
         );
       }
       
@@ -3487,15 +3736,10 @@ Suggestions:
         throw error;
       }
       return this.createErrorResponse(
-
-        "Failed to duplicate section: ${error.message}",
-
+        `Failed to duplicate section: ${error.message}`,
         "OPERATION_ERROR",
-
         "API_ERROR",
-
         "Operation failed"
-
       );
     }
   }
@@ -3516,15 +3760,10 @@ Suggestions:
       if (!parsedResult.success || !parsedResult.data) {
         console.error(`❌ Failed to get Elementor data: ${parsedResult.error}`);
         return this.createErrorResponse(
-
-          "Failed to get Elementor data for post/page ID ${args.post_id}: ${parsedResult.error || 'Unknown error'}. Cannot add widget.",
-
+          `Failed to get Elementor data for post/page ID ${args.post_id}: ${parsedResult.error || 'Unknown error'}. Cannot add widget.`,
           "OPERATION_ERROR",
-
           "API_ERROR",
-
           "Operation failed"
-
         );
       }
       
@@ -3547,7 +3786,8 @@ Suggestions:
       let targetFound = false;
       
       // Function to find target container and add widget
-      const findAndAddWidget = (elements: any[], visited = new Set()): boolean => {
+      const visited = new Set(); // Create visited set once, outside the function
+      const findAndAddWidget = (elements: any[]): boolean => {
         for (let element of elements) {
           // Prevent infinite recursion by tracking visited elements
           if (visited.has(element.id)) {
@@ -3565,16 +3805,27 @@ Suggestions:
             return true;
           }
           
-          // If section_id is specified, add to first column of that section
-          if (args.section_id && element.id === args.section_id && element.elType === 'section') {
-            if (element.elements && element.elements.length > 0) {
-              const firstColumn = element.elements[0];
-              if (args.position !== undefined && args.position >= 0 && args.position < firstColumn.elements.length) {
-                firstColumn.elements.splice(args.position, 0, newWidget);
+          // If section_id is specified, add to section or container
+          if (args.section_id && element.id === args.section_id && (element.elType === 'section' || element.elType === 'container')) {
+            if (element.elType === 'container') {
+              // For containers, add widget directly
+              if (args.position !== undefined && args.position >= 0 && args.position < element.elements.length) {
+                element.elements.splice(args.position, 0, newWidget);
               } else {
-                firstColumn.elements.push(newWidget);
+                element.elements.push(newWidget);
               }
               return true;
+            } else if (element.elType === 'section') {
+              // For sections, add to first column
+              if (element.elements && element.elements.length > 0) {
+                const firstColumn = element.elements[0];
+                if (args.position !== undefined && args.position >= 0 && args.position < firstColumn.elements.length) {
+                  firstColumn.elements.splice(args.position, 0, newWidget);
+                } else {
+                  firstColumn.elements.push(newWidget);
+                }
+                return true;
+              }
             }
           }
           
@@ -3588,7 +3839,7 @@ Suggestions:
           
           // Recursively search
           if (element.elements && element.elements.length > 0) {
-            if (findAndAddWidget(element.elements, visited)) {
+            if (findAndAddWidget(element.elements)) {
               return true;
             }
           }
@@ -3600,15 +3851,10 @@ Suggestions:
       
       if (!targetFound) {
         return this.createErrorResponse(
-
-          "Target container not found (section_id: ${args.section_id}, column_id: ${args.column_id})",
-
+          `Target container not found (section_id: ${args.section_id}, column_id: ${args.column_id})`,
           "OPERATION_ERROR",
-
           "API_ERROR",
-
           "Operation failed"
-
         );
       }
       
@@ -3634,15 +3880,10 @@ Suggestions:
         throw error;
       }
       return this.createErrorResponse(
-
-        "Failed to add widget: ${error.message}",
-
+        `Failed to add widget: ${error.message}`,
         "OPERATION_ERROR",
-
         "API_ERROR",
-
         "Operation failed"
-
       );
     }
   }
@@ -3656,15 +3897,10 @@ Suggestions:
       
       if (!parsedResult.success || !parsedResult.data) {
         return this.createErrorResponse(
-
-          "Failed to get Elementor data for post/page ID ${args.post_id}: ${parsedResult.error || 'Unknown error'}",
-
+          `Failed to get Elementor data for post/page ID ${args.post_id}: ${parsedResult.error || 'Unknown error'}`,
           "OPERATION_ERROR",
-
           "API_ERROR",
-
           "Operation failed"
-
         );
       }
       
@@ -3712,7 +3948,7 @@ Suggestions:
       if (!targetFound) {
         return this.createErrorResponse(
 
-          "Target element ID ${args.target_element_id} not found",
+          `Target element ID ${args.target_element_id} not found`,
 
           "OPERATION_ERROR",
 
@@ -3747,7 +3983,7 @@ Suggestions:
       }
       return this.createErrorResponse(
 
-        "Failed to insert widget: ${error.message}",
+        `Failed to insert widget: ${error.message}`,
 
         "OPERATION_ERROR",
 
@@ -3769,7 +4005,7 @@ Suggestions:
       if (!parsedResult.success || !parsedResult.data) {
         return this.createErrorResponse(
 
-          "Failed to get Elementor data for post/page ID ${args.post_id}: ${parsedResult.error || 'Unknown error'}",
+          `Failed to get Elementor data for post/page ID ${args.post_id}: ${parsedResult.error || 'Unknown error'}`,
 
           "OPERATION_ERROR",
 
@@ -3785,20 +4021,21 @@ Suggestions:
       let widgetToClone: any = null;
       
       // Function to find widget to clone
-      const findWidget = (elements: any[], visited = new Set()): any => {
+      const findWidgetVisited = new Set(); // Create visited set once, outside the function
+      const findWidget = (elements: any[]): any => {
         for (let element of elements) {
           // Prevent infinite recursion by tracking visited elements
-          if (visited.has(element.id)) {
+          if (findWidgetVisited.has(element.id)) {
             continue;
           }
-          visited.add(element.id);
+          findWidgetVisited.add(element.id);
           
           if (element.id === args.widget_id) {
             return JSON.parse(JSON.stringify(element)); // Deep copy
           }
           
           if (element.elements && element.elements.length > 0) {
-            const found = findWidget(element.elements, visited);
+            const found = findWidget(element.elements);
             if (found) return found;
           }
         }
@@ -3810,7 +4047,7 @@ Suggestions:
       if (!widgetToClone) {
         return this.createErrorResponse(
 
-          "Widget ID ${args.widget_id} not found",
+          `Widget ID ${args.widget_id} not found`,
 
           "OPERATION_ERROR",
 
@@ -3836,15 +4073,16 @@ Suggestions:
         // Insert at specific position
         let targetFound = false;
         
-        const findAndInsertWidget = (elements: any[], parent: any, visited = new Set()): boolean => {
+        const insertWidgetVisited = new Set(); // Create visited set once, outside the function
+        const findAndInsertWidget = (elements: any[], parent: any): boolean => {
           for (let i = 0; i < elements.length; i++) {
             const element = elements[i];
             
             // Prevent infinite recursion by tracking visited elements
-            if (visited.has(element.id)) {
+            if (insertWidgetVisited.has(element.id)) {
               continue;
             }
-            visited.add(element.id);
+            insertWidgetVisited.add(element.id);
             
             if (element.id === args.target_element_id) {
               const insertIndex = args.insert_position === 'before' ? i : i + 1;
@@ -3853,7 +4091,7 @@ Suggestions:
             }
             
             if (element.elements && element.elements.length > 0) {
-              if (findAndInsertWidget(element.elements, element, visited)) {
+              if (findAndInsertWidget(element.elements, element)) {
                 return true;
               }
             }
@@ -3867,7 +4105,7 @@ Suggestions:
         if (!targetFound) {
           return this.createErrorResponse(
 
-            "Target element ID ${args.target_element_id} not found",
+            `Target element ID ${args.target_element_id} not found`,
 
             "OPERATION_ERROR",
 
@@ -3879,13 +4117,14 @@ Suggestions:
         }
       } else {
         // Add to first available column or container
-        const findFirstContainer = (elements: any[], visited = new Set()): boolean => {
+        const containerVisited = new Set(); // Create visited set once, outside the function
+        const findFirstContainer = (elements: any[]): boolean => {
           for (let element of elements) {
             // Prevent infinite recursion by tracking visited elements
-            if (visited.has(element.id)) {
+            if (containerVisited.has(element.id)) {
               continue;
             }
-            visited.add(element.id);
+            containerVisited.add(element.id);
             
             // Check for traditional column
             if (element.elType === 'column') {
@@ -3900,7 +4139,7 @@ Suggestions:
             }
             
             if (element.elements && element.elements.length > 0) {
-              if (findFirstContainer(element.elements, visited)) {
+              if (findFirstContainer(element.elements)) {
                 return true;
               }
             }
@@ -3949,7 +4188,7 @@ Suggestions:
       }
       return this.createErrorResponse(
 
-        "Failed to clone widget: ${error.message}",
+        `Failed to clone widget: ${error.message}`,
 
         "OPERATION_ERROR",
 
@@ -3971,7 +4210,7 @@ Suggestions:
       if (!parsedResult.success || !parsedResult.data) {
         return this.createErrorResponse(
 
-          "Failed to get Elementor data for post/page ID ${args.post_id}: ${parsedResult.error || 'Unknown error'}",
+          `Failed to get Elementor data for post/page ID ${args.post_id}: ${parsedResult.error || 'Unknown error'}`,
 
           "OPERATION_ERROR",
 
@@ -4072,7 +4311,7 @@ Suggestions:
       if (!findTargetAndAddWidget(elementorData)) {
         return this.createErrorResponse(
 
-          "Target container not found (section_id: ${args.target_section_id}, column_id: ${args.target_column_id})",
+          `Target container not found (section_id: ${args.target_section_id}, column_id: ${args.target_column_id})`,
 
           "OPERATION_ERROR",
 
@@ -4105,15 +4344,10 @@ Suggestions:
         throw error;
       }
       return this.createErrorResponse(
-
-        "Failed to move widget: ${error.message}",
-
+        `Failed to move widget: ${error.message}`,
         "OPERATION_ERROR",
-
         "API_ERROR",
-
         "Operation failed"
-
       );
     }
   }
@@ -4128,15 +4362,10 @@ Suggestions:
       
       if (!parsedResult.success || !parsedResult.data) {
         return this.createErrorResponse(
-
-          "Failed to get Elementor data for post/page ID ${args.post_id}: ${parsedResult.error || 'Unknown error'}",
-
+          `Failed to get Elementor data for post/page ID ${args.post_id}: ${parsedResult.error || 'Unknown error'}`,
           "OPERATION_ERROR",
-
           "API_ERROR",
-
           "Operation failed"
-
         );
       }
       
@@ -4176,15 +4405,10 @@ Suggestions:
       
       if (!elementDeleted) {
         return this.createErrorResponse(
-
-          "Element ID ${args.element_id} not found",
-
+          `Element ID ${args.element_id} not found`,
           "OPERATION_ERROR",
-
           "API_ERROR",
-
           "Operation failed"
-
         );
       }
       
@@ -4212,7 +4436,7 @@ Suggestions:
       }
       return this.createErrorResponse(
 
-        "Failed to delete element: ${error.message}",
+        `Failed to delete element: ${error.message}`,
 
         "OPERATION_ERROR",
 
@@ -4300,7 +4524,7 @@ Suggestions:
       if (!containerFound) {
         return this.createErrorResponse(
 
-          "Container ID ${args.container_id} not found",
+          `Container ID ${args.container_id} not found`,
 
           "OPERATION_ERROR",
 
@@ -4334,7 +4558,7 @@ Suggestions:
       }
       return this.createErrorResponse(
 
-        "Failed to reorder elements: ${error.message}",
+        `Failed to reorder elements: ${error.message}`,
 
         "OPERATION_ERROR",
 
@@ -4356,7 +4580,7 @@ Suggestions:
       if (!parsedResult.success || !parsedResult.data) {
         return this.createErrorResponse(
 
-          "Failed to get Elementor data for post/page ID ${args.post_id}: ${parsedResult.error || 'Unknown error'}",
+          `Failed to get Elementor data for post/page ID ${args.post_id}: ${parsedResult.error || 'Unknown error'}`,
 
           "OPERATION_ERROR",
 
@@ -4393,7 +4617,7 @@ Suggestions:
       if (!sourceElement) {
         return this.createErrorResponse(
 
-          "Source element ID ${args.source_element_id} not found",
+          `Source element ID ${args.source_element_id} not found`,
 
           "OPERATION_ERROR",
 
@@ -4469,7 +4693,7 @@ Suggestions:
       }
       return this.createErrorResponse(
 
-        "Failed to copy element settings: ${error.message}",
+        `Failed to copy element settings: ${error.message}`,
 
         "OPERATION_ERROR",
 
@@ -4481,98 +4705,7 @@ Suggestions:
     }
   }
 
-  // Page Structure Tools
-  private async getPageStructure(args: { post_id: number; include_settings?: boolean }) {
-    this.ensureAuthenticated();
-    
-    try {
-      console.error(`🏗️ Getting page structure for ID: ${args.post_id}`);
-      
-      // Get current Elementor data using safe parsing utility
-      const parsedResult = await this.safeGetElementorData(args.post_id);
-      
-      if (!parsedResult.success || !parsedResult.data) {
-        console.error(`❌ Failed to get Elementor data: ${parsedResult.error}`);
-        return this.createErrorResponse(
-          `Could not get Elementor data for post/page ID ${args.post_id}: ${parsedResult.error || 'Unknown error'}`,
-          'GET_PAGE_STRUCTURE_ERROR',
-          'API_ERROR',
-          'Failed to retrieve Elementor data'
-        );
-      }
-      
-      const elementorData = parsedResult.data;
-      console.error(`✅ Successfully parsed structure for ${elementorData.length} top-level elements`);
-      
-      // Function to extract structure
-      const extractStructure = (elements: any[], level = 0): any[] => {
-        return elements.map(element => {
-          const structure: any = {
-            id: element.id,
-            type: element.elType,
-            widgetType: element.widgetType || null,
-            level: level
-          };
-          
-          if (args.include_settings && element.settings) {
-            structure.settings = element.settings;
-          }
-          
-          if (element.elements && element.elements.length > 0) {
-            structure.children = extractStructure(element.elements, level + 1);
-          }
-          
-          return structure;
-        });
-      };
-      
-      const structure = extractStructure(elementorData);
-      
-      return this.createSuccessResponse(
-        {
-          post_id: args.post_id,
-          structure: structure,
-          total_elements: elementorData.length,
-          include_settings: args.include_settings || false
-        },
-        `Successfully retrieved page structure for post/page ID ${args.post_id} with ${elementorData.length} top-level elements`
-      );
-    } catch (error: any) {
-      if (error instanceof McpError) {
-        throw error;
-      }
-      return this.createErrorResponse(
-        `Failed to get page structure: ${error.message}`,
-        "GET_PAGE_STRUCTURE_ERROR",
-        "API_ERROR",
-        "Operation failed"
-      );
-    }
-  }
-
   // Performance & Optimization
-  private async clearElementorCacheByPage(args: { post_id: number }) {
-    this.ensureAuthenticated();
-    
-    try {
-      await this.clearElementorCache(args.post_id);
-      
-      return this.createSuccessResponse(
-        {
-          post_id: args.post_id,
-          cache_cleared: true
-        },
-        `Cache cleared successfully for post/page ID: ${args.post_id}`
-      );
-    } catch (error: any) {
-      return this.createErrorResponse(
-        `Failed to clear cache: ${error.message}`,
-        "CLEAR_CACHE_ERROR",
-        "API_ERROR",
-        "Operation failed"
-      );
-    }
-  }
 
   private async clearElementorCacheGeneral(args: { post_id?: number }) {
     this.ensureAuthenticated();

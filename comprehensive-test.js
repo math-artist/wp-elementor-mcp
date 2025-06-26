@@ -163,8 +163,19 @@ async function testTool(client, tool, mode) {
           console.log(`  ⚠️  ${tool.name} - Response format issue: ${responseValidation.message}`);
         }
         
+        // Additional validation for optimized list operations
+        const optimizedValidation = validateOptimizedListResponse(tool.name, result);
+        let optimizedStatus = '';
+        if (['get_posts', 'get_pages', 'get_media', 'get_elementor_templates'].includes(tool.name)) {
+          if (optimizedValidation.valid) {
+            optimizedStatus = ' ⚡ Optimized';
+          } else {
+            console.log(`  ⚠️  ${tool.name} - Optimization issue: ${optimizedValidation.message}`);
+          }
+        }
+        
         const duration = Date.now() - testStart;
-        console.log(`  ✅ ${tool.name} - PASSED (${duration}ms)${responseValidation.valid ? ' 📋 Structured' : ''}`);
+        console.log(`  ✅ ${tool.name} - PASSED (${duration}ms)${responseValidation.valid ? ' 📋 Structured' : ''}${optimizedStatus}`);
         testResults.passed++;
         testResults.details.push({
           tool: tool.name,
@@ -172,7 +183,8 @@ async function testTool(client, tool, mode) {
           status: 'PASSED',
           duration,
           hasResponse: !!result,
-          structuredResponse: responseValidation.valid
+          structuredResponse: responseValidation.valid,
+          optimizedResponse: optimizedValidation.valid
         });
         
       } catch (callError) {
@@ -237,6 +249,7 @@ function getTestArgumentsForTool(toolName) {
       return { per_page: 5 };
       
     case 'get_post':
+    case 'get_page':
       return { id: post_id };
       
     case 'create_post':
@@ -263,8 +276,8 @@ function getTestArgumentsForTool(toolName) {
       return { post_id, elementor_data: '[]' };
       
     case 'get_elementor_elements':
-    case 'get_elementor_data_chunked':
-      return { post_id };
+    case 'get_elementor_data_smart':
+      return { post_id, element_index: 0, max_depth: 2 };
       
     case 'get_elementor_widget':
       return { post_id, widget_id };
@@ -313,12 +326,8 @@ function getTestArgumentsForTool(toolName) {
     case 'copy_element_settings':
       return { post_id, source_element_id: 'source123', target_element_id: 'target123' };
       
-    case 'get_page_structure':
-      return { post_id };
-      
     // Performance & Advanced Operations
     case 'clear_elementor_cache':
-    case 'clear_elementor_cache_by_page':
       return { post_id };
       
     case 'find_elements_by_type':
@@ -406,22 +415,22 @@ function requiresWordPressConnection(toolName) {
   const wpConnectionTools = [
     // WordPress Core Operations
     'get_posts', 'get_post', 'create_post', 'update_post',
-    'get_pages', 'create_page', 'update_page',
+    'get_pages', 'get_page', 'create_page', 'update_page',
     'get_media', 'upload_media', 'list_all_content',
     
     // Elementor Operations  
     'get_elementor_templates', 'get_elementor_data', 'update_elementor_data',
     'get_elementor_elements', 'get_elementor_widget', 'update_elementor_widget',
-    'update_elementor_section', 'get_elementor_data_chunked', 'backup_elementor_data',
+    'update_elementor_section', 'get_elementor_data_smart', 'get_elementor_structure_summary', 'backup_elementor_data',
     
     // Section & Widget Management
     'create_elementor_section', 'create_elementor_container', 'add_column_to_section',
     'duplicate_section', 'add_widget_to_section', 'insert_widget_at_position',
     'clone_widget', 'move_widget', 'delete_elementor_element', 'reorder_elements',
-    'copy_element_settings', 'get_page_structure',
+    'copy_element_settings',
     
     // Performance & Advanced Operations
-    'clear_elementor_cache', 'clear_elementor_cache_by_page', 'find_elements_by_type'
+    'clear_elementor_cache', 'find_elements_by_type'
   ];
   
   return wpConnectionTools.includes(toolName);
@@ -478,6 +487,88 @@ function validateResponseFormat(result) {
     
   } catch (parseError) {
     return { valid: false, message: 'Response text is not valid JSON' };
+  }
+}
+
+  function validateOptimizedListResponse(toolName, result) {
+  // Special validation for optimized list operations
+  if (!['get_posts', 'get_pages', 'get_media', 'get_elementor_templates'].includes(toolName)) {
+    return { valid: true, message: 'Not an optimized list tool' };
+  }
+  
+  try {
+    const parsedResponse = JSON.parse(result.content[0].text);
+    
+    if (parsedResponse.status !== 'success') {
+      return { valid: true, message: 'Error response - not validating optimized format' };
+    }
+    
+    const data = parsedResponse.data;
+    
+    // Check for optimized response indicators
+    if (!data.performance_note || typeof data.performance_note !== 'string') {
+      return { valid: false, message: 'Missing performance optimization note' };
+    }
+    
+    // Validate specific list tool formats
+    switch (toolName) {
+      case 'get_posts':
+        if (!data.posts || !Array.isArray(data.posts)) {
+          return { valid: false, message: 'Missing or invalid posts array' };
+        }
+        // Check if posts are summaries (should have id, title, etc. but not full content)
+        if (data.posts.length > 0) {
+          const firstPost = data.posts[0];
+          if (!firstPost.id || !firstPost.title || !firstPost.elementor_status) {
+            return { valid: false, message: 'Post summaries missing required fields' };
+          }
+        }
+        break;
+        
+      case 'get_pages':
+        if (!data.pages || !Array.isArray(data.pages)) {
+          return { valid: false, message: 'Missing or invalid pages array' };
+        }
+        // Check if pages are summaries
+        if (data.pages.length > 0) {
+          const firstPage = data.pages[0];
+          if (!firstPage.id || !firstPage.title || !firstPage.elementor_status) {
+            return { valid: false, message: 'Page summaries missing required fields' };
+          }
+        }
+        break;
+        
+      case 'get_media':
+        if (!data.media || !Array.isArray(data.media)) {
+          return { valid: false, message: 'Missing or invalid media array' };
+        }
+        // Check if media items are summaries
+        if (data.media.length > 0) {
+          const firstMedia = data.media[0];
+          if (!firstMedia.id || !firstMedia.title || !firstMedia.mime_type) {
+            return { valid: false, message: 'Media summaries missing required fields' };
+          }
+        }
+        break;
+        
+      case 'get_elementor_templates':
+        if (!data.templates || !Array.isArray(data.templates)) {
+          return { valid: false, message: 'Missing or invalid templates array' };
+        }
+        // Check if templates are summaries
+        if (data.templates.length > 0) {
+          const firstTemplate = data.templates[0];
+          if (!firstTemplate.id || !firstTemplate.title || !firstTemplate.template_type) {
+            return { valid: false, message: 'Template summaries missing required fields' };
+          }
+        }
+        break;
+    }
+    
+    return { valid: true, message: `Optimized ${toolName} response format validated` };
+    
+  } catch (parseError) {
+    return { valid: false, message: 'Failed to parse optimized response JSON' };
   }
 }
 

@@ -34,14 +34,20 @@ const ENHANCED_FEATURES_CONFIG = {
     {
       name: 'get_posts_enhanced_debug',
       tool: 'get_posts',
-      args: { per_page: 3, context: 'edit' },
-      expectDebugInfo: true
+      args: { per_page: 3 },
+      expectOptimizedFormat: true
     },
     {
       name: 'get_pages_enhanced_debug',
       tool: 'get_pages', 
-      args: { per_page: 3, context: 'edit' },
-      expectDebugInfo: true
+      args: { per_page: 3 },
+      expectOptimizedFormat: true
+    },
+    {
+      name: 'get_page_debug',
+      tool: 'get_page',
+      args: { id: 99999 }, // Non-existent page ID
+      expectEnhancedError: true
     }
   ]
 };
@@ -328,37 +334,79 @@ function validateEnhancedFeatureResult(testCase, result, hadError, errorMessage)
       }
       
       // Parse the structured response
-      const debugResponse = parseStructuredResponse(result);
-      if (!debugResponse.isValid) {
-        return { success: false, message: debugResponse.error || 'Invalid response structure' };
+      const optimizedResponse = parseStructuredResponse(result);
+      if (!optimizedResponse.isValid) {
+        return { success: false, message: optimizedResponse.error || 'Invalid response structure' };
       }
       
       // Validate successful response structure
-      if (debugResponse.status !== 'success') {
+      if (optimizedResponse.status !== 'success') {
         return { 
           success: false, 
-          message: `Expected success status, got: ${debugResponse.status}` 
+          message: `Expected success status, got: ${optimizedResponse.status}` 
         };
       }
       
-      // Validate enhanced debug information
-      if (!debugResponse.data || !debugResponse.data.summary) {
+      // Validate optimized response format
+      if (!optimizedResponse.data || !optimizedResponse.data.performance_note) {
         return { 
           success: false, 
-          message: 'Missing expected debug data structure' 
+          message: 'Missing expected optimized response indicators' 
         };
       }
       
-      // Check for enhanced debug content
-      const debugSummary = debugResponse.data.summary;
-      if (!debugSummary.includes('Found') || !debugSummary.includes('Elementor')) {
+      // Check for performance optimization note
+      if (!optimizedResponse.data.performance_note.includes('Optimized') && 
+          !optimizedResponse.data.performance_note.includes('use get_')) {
         return { 
           success: false, 
-          message: 'Missing expected debug information (Found X posts/pages with Elementor status)' 
+          message: 'Missing performance optimization note' 
         };
       }
       
-      return { success: true, message: 'Enhanced debug information detected in structured response' };
+      // Check for appropriate data structure
+      const toolName = testCase.tool;
+      if (toolName === 'get_posts') {
+        if (!optimizedResponse.data.posts || !Array.isArray(optimizedResponse.data.posts)) {
+          return { success: false, message: 'Missing posts array in optimized response' };
+        }
+      } else if (toolName === 'get_pages') {
+        if (!optimizedResponse.data.pages || !Array.isArray(optimizedResponse.data.pages)) {
+          return { success: false, message: 'Missing pages array in optimized response' };
+        }
+      }
+      
+      return { success: true, message: 'Optimized response format validated successfully' };
+      
+    case 'get_page_debug':
+      if (hadError) {
+        // Connection errors are expected without WordPress
+        if (errorMessage.includes('WordPress connection not configured') ||
+            errorMessage.includes('ECONNREFUSED')) {
+          return { 
+            success: true, 
+            message: 'Expected connection error (would work with WordPress)' 
+          };
+        }
+        return { success: false, message: `Unexpected error: ${errorMessage}` };
+      }
+      
+      // Parse the structured response
+      const pageErrorResponse = parseStructuredResponse(result);
+      if (pageErrorResponse.isValid && pageErrorResponse.status === 'error') {
+        // Validate it's a proper error response for non-existent page
+        const errorData = pageErrorResponse.data;
+        if (errorData.message && 
+            (errorData.message.includes('not found') || 
+             errorData.message.includes('99999') ||
+             errorData.code === 'PAGE_NOT_FOUND' ||
+             errorData.code === 'GET_PAGE_ERROR')) {
+          return { success: true, message: 'Valid structured error response for non-existent page' };
+        }
+        return { success: false, message: 'Error response but not for expected reason' };
+      }
+      
+      return { success: false, message: 'Expected error response for non-existent page ID' };
       
     default:
       return { success: false, message: 'Unknown test case' };

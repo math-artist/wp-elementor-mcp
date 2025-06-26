@@ -10,40 +10,80 @@ This document provides comprehensive information about testing the Elementor Wor
 - **Tool Categories**: 11/11 covered ✅ 
 - **Configuration Modes**: 4 different modes tested ✅
 - **Performance**: Average 1ms validation time ✅
+- **Performance Optimization**: New benchmarking suite ✅
 
 ### Test Coverage by Mode
-| Mode | Tools | Validation | Status |
-|------|-------|------------|--------|
-| Essential | 20 | 100% | ✅ Ready |
-| Standard | 32 | 100% | ✅ Ready |
-| Advanced | 34 | 100% | ✅ Ready |
-| Full | 34 | 100% | ✅ Ready |
+| Mode | Tools | Validation | Performance | Status |
+|------|-------|------------|-------------|--------|
+| Essential | 20 | 100% | ✅ Optimized | ✅ Ready |
+| Standard | 32 | 100% | ✅ Optimized | ✅ Ready |
+| Advanced | 34 | 100% | ✅ Optimized | ✅ Ready |
+| Full | 34 | 100% | ✅ Optimized | ✅ Ready |
 
 ## 🚀 Quick Start Testing
 
-### 1. Basic Server Test
+### Essential Testing (CI/CD)
 ```bash
-npm test
+# Run all CI tests (recommended for most users)
+npm run test:ci
 ```
-**Purpose**: Verify server starts correctly and MCP protocol works
-**Time**: ~5 seconds
-**Requirements**: None
-
-### 2. Schema Validation
-```bash
-npm run test:validate
-```
-**Purpose**: Validate all tool schemas and structure
-**Time**: ~30 seconds
+**Purpose**: Complete validation of core functionality
+**Time**: ~1-2 minutes
 **Requirements**: None (no WordPress connection needed)
 
-### 3. Test Summary
+**What it includes**:
+- Server startup validation (`npm test`)
+- Schema validation (`npm run test:validate`) 
+- Enhanced features testing (`npm run test:enhanced`)
+- Comprehensive tool testing (`npm run test:comprehensive`)
+
+### Performance Testing (NEW in v1.7.0)
 ```bash
-npm run test:summary
+# Test performance optimizations
+npm run test:performance
+
+# Or run the performance test file directly
+node test-performance-optimizations.js
 ```
-**Purpose**: Get comprehensive overview with recommendations
-**Time**: ~45 seconds
-**Requirements**: None
+**Purpose**: Validate performance improvements and benchmark tools
+**Time**: ~3-5 minutes
+**Requirements**: WordPress credentials for real performance testing
+
+**What it tests**:
+- Data payload size reductions (get_posts, get_pages)
+- Response time improvements
+- Memory usage optimization
+- Performance regression detection
+- Real-world scenarios with various data sizes
+
+### Individual Test Suites
+```bash
+# Basic server functionality
+npm test
+
+# Schema and structure validation  
+npm run test:validate
+
+# Performance optimizations (NEW)
+npm run test:performance
+
+# Enhanced features testing
+npm run test:enhanced
+
+# Comprehensive tool functionality
+npm run test:comprehensive
+```
+
+### Extended Testing
+```bash
+# All tests including manual testing tools
+npm run test:all
+
+# Individual extended tests
+npm run test:tools      # Tool-specific tests
+npm run test:summary    # Detailed summary report
+npm run test:credentials # WordPress credential testing
+```
 
 ## 🔬 Detailed Testing
 
