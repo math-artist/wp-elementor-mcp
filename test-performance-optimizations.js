@@ -83,7 +83,7 @@ async function testPerformanceOptimizationsForMode(mode) {
     
     transport = new StdioClientTransport({
       command: 'node',
-      args: ['dist/index-refactored.js'],
+      args: ['dist/index.js'],
       env
     });
 

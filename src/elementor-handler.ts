@@ -6,39 +6,81 @@ import { ResponseHelpers, ElementorHelpers } from './helpers.js';
 export class ElementorDataHandler {
   constructor(private wordPressClient: WordPressClient) {}
 
-  // Safe method to get parsed Elementor data with comprehensive error handling
+  // Safe method to get raw Elementor data directly from WordPress
   async safeGetElementorData(postId: number): Promise<ParsedElementorData> {
+    const authCheck = this.wordPressClient.ensureAuthenticated();
+    if (authCheck) {
+      return {
+        success: false,
+        error: 'WordPress connection not configured',
+        debugInfo: 'Authentication check failed'
+      };
+    }
+    
     try {
-      const response = await this.getElementorData({ post_id: postId });
+      console.error(`🔍 Getting raw Elementor data for post ID: ${postId}`);
       
-      // Parse the JSON response from content[0].text
-      const responseText = response.content[0].text;
-      const parsedResponse = JSON.parse(responseText);
+      const axios = this.wordPressClient.getAxiosInstance();
       
-      // Check if response indicates success and has data
-      if (parsedResponse.status === 'success' && parsedResponse.data?.elementor_data) {
-        return {
-          success: true,
-          data: parsedResponse.data.elementor_data,
-          debugInfo: `Successfully retrieved ${parsedResponse.data.elementor_data.length} elements for post ${postId}`
-        };
-      } else if (parsedResponse.status === 'error') {
-        return {
-          success: false,
-          error: parsedResponse.data?.message || parsedResponse.message || 'Unknown error from getElementorData',
-          debugInfo: parsedResponse.data?.details || parsedResponse.details || ''
-        };
+      // Try to get as post first, then as page if that fails
+      let response;
+      let postType = 'post';
+      
+      try {
+        response = await axios.get(`posts/${postId}`, {
+          params: { context: 'edit' }
+        });
+      } catch (postError: any) {
+        if (postError.response?.status === 404) {
+          try {
+            response = await axios.get(`pages/${postId}`, {
+              params: { context: 'edit' }
+            });
+            postType = 'page';
+          } catch (pageError: any) {
+            return {
+              success: false,
+              error: `Post/Page ID ${postId} not found in either posts or pages`,
+              debugInfo: `Post error: ${postError.response?.status}, Page error: ${pageError.response?.status}`
+            };
+          }
+        } else {
+          throw postError;
+        }
+      }
+      
+      // Extract Elementor data directly
+      const data = response.data;
+      const elementorData = data.meta?._elementor_data;
+      const elementorEditMode = data.meta?._elementor_edit_mode;
+      
+      if (elementorData) {
+        try {
+          const parsedData = JSON.parse(elementorData);
+          return {
+            success: true,
+            data: parsedData,
+            debugInfo: `Successfully retrieved ${Array.isArray(parsedData) ? parsedData.length : 0} elements for ${postType} ${postId}`
+          };
+        } catch (parseError) {
+          return {
+            success: false,
+            error: 'Failed to parse Elementor data JSON',
+            debugInfo: `JSON parsing error: ${parseError}`
+          };
+        }
       } else {
         return {
           success: false,
-          error: 'Unexpected response format from getElementorData',
-          debugInfo: `Response status: ${parsedResponse.status}`
+          error: `No Elementor data found for ${postType} ID ${postId}`,
+          debugInfo: `Edit mode: ${elementorEditMode || 'None'}, Available meta keys: ${data.meta ? Object.keys(data.meta).join(', ') : 'None'}`
         };
       }
     } catch (error: any) {
       return {
         success: false,
-        error: `Failed to retrieve Elementor data: ${error.message}`
+        error: `Failed to retrieve Elementor data: ${error.message}`,
+        debugInfo: `API call error: ${error.stack}`
       };
     }
   }
@@ -48,31 +90,14 @@ export class ElementorDataHandler {
     try {
       console.error(`📁 Getting Elementor data for post ${args.post_id} and writing to temp file...`);
       
-      // Get the raw Elementor data
-      const axios = this.wordPressClient.getAxiosInstance();
-      const config = this.wordPressClient.getConfig();
-      
-      const response = await this.wordPressClient.safeApiCall(
-        () => axios.get(`${config.baseUrl}/wp-admin/admin-ajax.php`, {
-          params: {
-            action: 'mcp_get_elementor_data',
-            post_id: args.post_id,
-            format: 'json',
-            include_meta: 'true'
-          }
-        }),
-        'get Elementor data for temp file',
-        `post ID ${args.post_id}`
-      );
-
-      // Parse the response to extract actual data
-      const parsedData = ElementorDataParser.parseElementorResponse(response.data);
+      // Use the existing safe method to get Elementor data
+      const parsedData = await this.safeGetElementorData(args.post_id);
       
       if (!parsedData.success) {
         return {
           content: [{
             type: 'text',
-            text: `Error parsing Elementor data: ${parsedData.error}`
+            text: `Error getting Elementor data: ${parsedData.error}`
           }]
         };
       }

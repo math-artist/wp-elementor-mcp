@@ -1,5 +1,5 @@
 import { writeFileSync, mkdirSync, existsSync } from 'fs';
-import { join } from 'path';
+import { join, resolve } from 'path';
 import { ParsedElementorData, TempFileResult } from './types.js';
 
 export class ElementorDataParser {
@@ -123,7 +123,7 @@ export class ElementorDataParser {
 }
 
 export class TempFileManager {
-  private static readonly TEMP_DIR = '/tmp/elementor-data';
+  private static readonly TEMP_DIR = resolve(process.cwd(), 'tmp', 'elementor-data');
 
   static ensureTempDir(): void {
     if (!existsSync(this.TEMP_DIR)) {
